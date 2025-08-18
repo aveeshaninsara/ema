@@ -3,183 +3,200 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerts - Elephant Monitoring</title>
+<title>Elephant Alerts</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
 <style>
-body{font-family:Roboto,sans-serif;background:#fafafa;margin:0;}
-.card{padding:12px;border-radius:12px;margin:12px auto;max-width:480px;cursor:pointer;}
-.card .card-content{padding:10px;}
-.expandable{overflow:hidden;transition:max-height 0.3s ease;}
-.action-btns{display:flex;justify-content:space-between;margin:12px auto;max-width:480px;}
-.pdf-btn,.delete-btn,.map-btn,.img-btn{margin:4px;}
-.modal{max-width:480px;}
+body { font-family: Roboto, sans-serif; margin:0; padding:0; background:#f0f0f0; }
+.header { display:flex; justify-content:space-between; align-items:center; padding:12px; background:#2e7d32; color:white; }
+.header h5 { margin:0; }
+.btn-container { display:flex; gap:12px; margin:12px; flex-wrap:wrap; }
+.card-report { margin:12px auto; max-width:480px; border-radius:12px; overflow:hidden; background:white; cursor:pointer; }
+.card-content { padding:12px; }
+.card-header { display:flex; justify-content:space-between; align-items:center; }
+.card-footer { display:flex; justify-content:flex-end; gap:12px; padding:12px; }
+.map-popup, .images-popup { width:300px; height:200px; }
+.hidden { display:none; }
 </style>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, update, child, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  measurementId: "G-GSQEVX635R"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+window._fb = { db, ref, get, update, child, remove };
+</script>
 </head>
 <body>
-<nav class="green">
-<div class="nav-wrapper">
-<a href="#!" class="brand-logo center">Alerts</a>
-<a href="home.html" class="btn red right" style="margin:6px">Home</a>
+<div class="header">
+<h5>Elephant Alerts</h5>
+<div>
+<a href="home.html" class="btn green">Home</a>
+<a id="btnDeletedReports" class="btn orange">Why is my report not showing?</a>
 </div>
-</nav>
-
-<div class="container">
-<div style="margin:12px 0;">
+</div>
+<div class="btn-container">
 <select id="filterType">
-<option value="all" selected>All Types</option>
+<option value="all">All Reports</option>
 <option value="sightings">Sightings</option>
 <option value="accidents">Accidents</option>
 </select>
 <select id="filterDistrict">
-<option value="all" selected>All Districts</option>
+<option value="all">All Districts</option>
 </select>
-<button id="btnWhy" class="btn blue" style="margin-left:8px">Why is my report not showing?</button>
 </div>
 <div id="reportsContainer"></div>
-<div id="deletedReportsContainer" style="display:none;"></div>
-</div>
+<div id="deletedContainer" class="hidden"></div>
 
-<div id="deleteModal" class="modal">
-<div class="modal-content">
-<h5>Delete Report</h5>
-<div class="input-field">
-<select id="deleteReason">
-<option value="fake report" selected>Fake report</option>
-<option value="miscontent">Miscontent</option>
-<option value="fraud information">Fraud information</option>
-<option value="description is fake">Description is fake</option>
-<option value="duplicate report">Duplicate report</option>
-<option value="other">Other</option>
-</select>
-<label>Reason</label>
-</div>
-<div class="input-field">
-<input type="text" id="deleteAgentName" disabled>
-<label>Agent Name</label>
-</div>
-<div class="input-field">
-<input type="text" id="deleteAgentID">
-<label>Agent ID</label>
-</div>
-<p>I agree this information is correct and I will not harass anyone.</p>
-</div>
-<div class="modal-footer">
-<a href="#!" id="confirmDeleteBtn" class="btn red">Delete</a>
-</div>
-</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  M.FormSelect.init(document.querySelectorAll('select'));
+  const districts = ["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
+  const districtSelect = document.getElementById("filterDistrict");
+  districts.forEach(d => { let opt=document.createElement("option"); opt.value=d; opt.textContent=d; districtSelect.appendChild(opt); });
+  M.FormSelect.init(document.querySelectorAll('select'));
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, set, update, child, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  const getCookie = name => document.cookie.split('; ').find(r => r.startsWith(name+'='))?.split('=')[1] || '';
+  const userId = getCookie("emaId");
+  if(!userId){ window.location.href="index.html"; return; }
 
-const firebaseConfig = {
-apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
-authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app",
-projectId: "elephant-monitoring-app-99ffd",
-storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
-messagingSenderId: "649960879930",
-appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-measurementId: "G-GSQEVX635R"
-};
+  const userSnap = await get(child(ref(db), "users/"+userId));
+  const userData = userSnap.exists()? userSnap.val() : null;
+  const isAgent = userData?.agentId;
+  const agentDistrict = userData?.district;
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+  const reportsContainer = document.getElementById("reportsContainer");
+  const deletedContainer = document.getElementById("deletedContainer");
+  const filterType = document.getElementById("filterType");
+  const filterDistrict = document.getElementById("filterDistrict");
 
-document.addEventListener("DOMContentLoaded", async ()=>{
-M.FormSelect.init(document.querySelectorAll('select'));
-const districts=["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
-const districtSelect=document.getElementById("filterDistrict");
-districts.forEach(d=>{let opt=document.createElement("option");opt.value=d;opt.textContent=d;districtSelect.appendChild(opt);});
-M.FormSelect.init(document.querySelectorAll('select'));
+  async function loadReports(){
+    reportsContainer.innerHTML='';
+    const allReportsSnap = await get(ref(db,"reports"));
+    const now = new Date();
+    if(!allReportsSnap.exists()) return;
+    const types = ["sightings","accidents"];
+    for(const t of types){
+      if(filterType.value!=="all" && filterType.value!==t) continue;
+      const typeSnap = allReportsSnap.child(t);
+      if(!typeSnap.exists()) continue;
+      const reports = typeSnap.val();
+      for(const rKey in reports){
+        const r = reports[rKey];
+        if(new Date(r.time) < now - 24*60*60*1000) continue;
+        if(filterDistrict.value!=="all" && r.district!==filterDistrict.value) continue;
+        const card = document.createElement("div");
+        card.className="card-report";
+        card.innerHTML=`
+        <div class="card-content">
+          <div class="card-header">
+            <span><b>${t.toUpperCase()}</b> - ${r.district}</span>
+            ${isAgent && agentDistrict===r.district ? '<a href="#!" class="btn red btnDelete">Delete</a>' : ''}
+          </div>
+          <p><b>Reporter:</b> ${r.userName} (${r.userMobile})</p>
+          <p><b>Elephants:</b> ${r.numElephants}</p>
+          <p><b>Danger:</b> ${r.dangerLevel}</p>
+          <p><b>Description:</b> ${r.description}</p>
+          <div class="card-footer">
+            <a href="#!" class="btn-small blue btnMap">Map</a>
+            <a href="#!" class="btn-small green btnImages">Images</a>
+            <a href="#!" class="btn-small orange btnPDF">PDF</a>
+          </div>
+        </div>`;
+        reportsContainer.appendChild(card);
 
-const userId=prompt("Enter your userId"); 
-if(!userId){alert("No userId"); return;}
-let userData={};
-const userSnap=await get(child(ref(db), "users/"+userId));
-if(userSnap.exists()) userData=userSnap.val();
-const agentMode=userData.agentId?true:false;
+        const btnMap = card.querySelector(".btnMap");
+        btnMap.addEventListener("click",()=>{ 
+          const mapDiv = document.createElement("div"); mapDiv.style.width="300px"; mapDiv.style.height="200px";
+          const mapWin = window.open("", "_blank", "width=320,height=240"); mapWin.document.body.appendChild(mapDiv);
+          const map = L.map(mapDiv).setView([r.lat,r.lng],13);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+          L.marker([r.lat,r.lng]).addTo(map);
+        });
 
-async function loadReports(){
-document.getElementById("reportsContainer").innerHTML="";
-const typeFilter=document.getElementById("filterType").value;
-const districtFilter=document.getElementById("filterDistrict").value;
-const reportsSnap=await get(ref(db,"reports"));
-if(!reportsSnap.exists()) return;
-["sightings","accidents"].forEach(type=>{
-if(typeFilter!=="all" && type!==typeFilter) return;
-const reports=reportsSnap.val()[type];
-if(!reports) return;
-Object.entries(reports).forEach(([id,r])=>{
-const reportTime=new Date(r.time);
-if(Date.now()-reportTime.getTime()>24*3600*1000) return;
-if(districtFilter!=="all" && r.district!==districtFilter) return;
-const card=document.createElement("div"); card.className="card white";
-card.innerHTML=`
-<div class="card-content">
-<span class="card-title">${type.toUpperCase()}</span>
-<p><b>Reporter:</b> ${r.userName} (${r.userMobile})</p>
-<p><b>District:</b> ${r.district}</p>
-<p><b>Elephants:</b> ${r.numElephants}</p>
-<p><b>Danger:</b> ${r.dangerLevel}</p>
-<p class="expandable" style="max-height:40px;">${r.description}</p>
-<div class="action-btns">
-<a href="#!" class="btn blue img-btn">Images</a>
-<a href="#!" class="btn green map-btn">Map</a>
-<a href="#!" class="btn orange pdf-btn">PDF</a>
-${agentMode && userData.district===r.district?'<a href="#deleteModal" class="btn red modal-trigger delete-btn">Delete</a>':""}
-</div>
-</div>`;
-document.getElementById("reportsContainer").appendChild(card);
+        const btnImages = card.querySelector(".btnImages");
+        btnImages.addEventListener("click",()=>{
+          const imgWin = window.open("", "_blank","width=400,height=400");
+          if(r.images){ r.images.forEach(src=>{ const i=document.createElement("img"); i.src=src; i.style.width="100%"; i.style.marginBottom="8px"; imgWin.document.body.appendChild(i); }); }
+        });
 
-const expandable=card.querySelector(".expandable");
-card.querySelector(".card-content").addEventListener("click", ()=>{
-if(expandable.style.maxHeight==="none") expandable.style.maxHeight="40px";
-else expandable.style.maxHeight="none";
-});
-card.querySelector(".img-btn").onclick=()=>{alert("Show images popup");};
-card.querySelector(".map-btn").onclick=()=>{alert(`Show map at ${r.lat},${r.lng}`);};
-card.querySelector(".pdf-btn").onclick=()=>{alert("Download PDF");};
-const deleteBtn=card.querySelector(".delete-btn");
-if(deleteBtn){
-deleteBtn.onclick=()=>{
-document.getElementById("deleteAgentName").value=userData.name;
-M.Modal.getInstance(document.getElementById("deleteModal")).open();
-document.getElementById("confirmDeleteBtn").onclick=async ()=>{
-const reason=document.getElementById("deleteReason").value;
-const agentID=document.getElementById("deleteAgentID").value;
-if(agentID!==userData.agentId){alert("Invalid agent ID"); return;}
-await set(child(ref(db, "deletedreportinfo/"+r.userId+"/"+id), {agentName:userData.name, agentId:agentID, reason, type:type, time:new Date().toString()}));
-await remove(ref(db,"reports/"+type+"/"+id));
-M.Modal.getInstance(document.getElementById("deleteModal")).close();
-loadReports();
-};
-};
-}
-});
-}
-}
+        const btnPDF = card.querySelector(".btnPDF");
+        btnPDF.addEventListener("click",()=>{
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+          doc.setFontSize(12); doc.text("Report PDF",10,10);
+          doc.text(`Type: ${t}`,10,20);
+          doc.text(`District: ${r.district}`,10,30);
+          doc.text(`Reporter: ${r.userName} (${r.userMobile})`,10,40);
+          doc.text(`Elephants: ${r.numElephants}`,10,50);
+          doc.text(`Danger: ${r.dangerLevel}`,10,60);
+          doc.text(`Description: ${r.description}`,10,70);
+          doc.text(`Time: ${r.time}`,10,80);
+          doc.save("report.pdf");
+        });
 
-loadReports();
-document.getElementById("filterType").onchange=loadReports;
-document.getElementById("filterDistrict").onchange=loadReports;
-document.getElementById("btnWhy").onclick=async ()=>{
-document.getElementById("deletedReportsContainer").style.display="block";
-const container=document.getElementById("deletedReportsContainer");
-container.innerHTML="";
-const snap=await get(ref(db,"deletedreportinfo"));
-if(!snap.exists()) return;
-Object.entries(snap.val()).forEach(([uid,reports])=>{
-Object.entries(reports).forEach(([rid,info])=>{
-const div=document.createElement("div"); div.className="card white";
-div.innerHTML=`<div class="card-content"><p>User: ${uid}</p><p>Report: ${rid}</p><p>Deleted by: ${info.agentName} (${info.agentId})</p><p>Reason: ${info.reason}</p></div>`;
-container.appendChild(div);
-});
-});
-};
+        if(isAgent && agentDistrict===r.district){
+          const btnDel = card.querySelector(".btnDelete");
+          btnDel.addEventListener("click",async()=>{
+            const reason = prompt("Reason for deletion: fake report, miscontent, fraud information, description is fake, duplicate report, other");
+            if(!reason) return;
+            const agentName = userData.name || "Unknown";
+            const agentId = userData.agentId;
+            const deletedInfo = { reason, agentName, agentId, time:new Date().toString() };
+            await update(ref(db,`deletedreportinfo/${r.userId}/${rKey}`), deletedInfo);
+            await remove(ref(db,`reports/${t}/${rKey}`));
+            alert("Report deleted!");
+            loadReports();
+          });
+        }
+      }
+    }
+  }
+
+  document.getElementById("btnDeletedReports").addEventListener("click", async ()=>{
+    reportsContainer.innerHTML=''; deletedContainer.innerHTML=''; deletedContainer.classList.remove("hidden");
+    const delSnap = await get(ref(db,"deletedreportinfo"));
+    if(!delSnap.exists()) return;
+    const delData = delSnap.val();
+    for(const uid in delData){
+      for(const repId in delData[uid]){
+        const d = delData[uid][repId];
+        const card = document.createElement("div");
+        card.className="card-report";
+        card.innerHTML=`
+          <div class="card-content">
+            <p><b>Reporter ID:</b> ${uid}</p>
+            <p><b>Deleted by:</b> ${d.agentName} (${d.agentId})</p>
+            <p><b>Reason:</b> ${d.reason}</p>
+            <p><b>Time:</b> ${d.time}</p>
+            <p><b>Mobile:</b> <span class="callNumber">${userData.userMobile || 'N/A'}</span></p>
+          </div>`;
+        deletedContainer.appendChild(card);
+      }
+    }
+    document.querySelectorAll(".callNumber").forEach(el=>{
+      el.addEventListener("click",()=>{ navigator.clipboard.writeText(el.textContent); alert("Number copied!"); });
+    });
+  });
+
+  filterType.addEventListener("change", loadReports);
+  filterDistrict.addEventListener("change", loadReports);
+  loadReports();
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 </body>
 </html>
