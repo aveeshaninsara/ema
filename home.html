@@ -4,11 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home - Elephant Monitoring App</title>
-
-<!-- Materialize CSS -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getDatabase, ref, get, set, update, child, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
@@ -43,7 +39,6 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
 </head>
 <body>
 
-<!-- Profile Card -->
 <div class="card white card-thin" id="profileCard">
   <div class="valign-wrapper">
     <img id="profilePic" src="" class="profile-pic">
@@ -55,7 +50,7 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
   </div>
 </div>
 
-<!-- Stats Card -->
+
 <div class="card white stat-card">
   <div class="stat-item">
     <h6 id="statElephants">0</h6>
@@ -75,7 +70,7 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
   </div>
 </div>
 
-<!-- Action Buttons -->
+
 <div class="action-btns">
   <a href="report.html" class="btn green">Report</a>
   <a href="alert.html" class="btn red">Alert</a>
@@ -83,11 +78,10 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
   <a href="analytics.html" class="btn orange">Analytics</a>
 </div>
 
-<!-- Floating Buttons -->
+
 <a href="report.html" class="btn-floating btn-large green fixed-btn"><i class="material-icons">add</i></a>
 <a href="chatbot.html" class="ai-btn"><i class="material-icons">smart_toy</i></a>
 
-<!-- Edit Profile Modal -->
 <div id="editProfileModal" class="modal">
   <div class="modal-content">
     <h5>Edit Profile</h5>
@@ -124,7 +118,7 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
   </div>
 </div>
 
-<!-- Agent Registration Modal -->
+
 <div id="agentModal" class="modal">
   <div class="modal-content">
     <h5>Agent Registration</h5>
@@ -138,7 +132,6 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
   </div>
 </div>
 
-<!-- Materialize + JS -->
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 <script>
@@ -168,7 +161,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const userId=getCookie("emaId");
   if(!userId){window.location.href="index.html";return;}
 
-  // Load user data
+
   get(child(ref(db),"users/"+userId)).then(snap=>{
     if(snap.exists()){
       const u=snap.val();
@@ -195,7 +188,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Save profile
+
   document.getElementById("btnSaveProfile").addEventListener("click",async()=>{
     const file=document.getElementById("editPic").files[0];
     let updates={
@@ -218,14 +211,24 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Logout
-  document.getElementById("btnLogout").addEventListener("click",()=>{
-    document.cookie="emaId=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/";
-    localStorage.clear();
-    window.location.href="index.html";
+
+  document.getElementById("btnLogout").addEventListener("click", () => {
+
+  document.cookie = "emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+  document.cookie = "emaId=; path=/; SameSite=Lax; Secure; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+
+
+  localStorage.clear();
+  sessionStorage.clear();
+
+  
+  setTimeout(() => {
+    window.location.href = "index.html";
+  }, 200);
+});
+
   });
 
-  // Register agent
   document.getElementById("btnRegisterAgent").addEventListener("click",async()=>{
     const agentId="EA-"+Math.floor(1000+Math.random()*9000);
     const info={
@@ -238,7 +241,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     location.reload();
   });
 
-  // Load stats (real DB nodes expected: /stats)
   get(ref(db,"stats")).then(snap=>{
     if(snap.exists()){
       const s=snap.val();
@@ -249,7 +251,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Profile click → open modal
+  
   document.getElementById("profileCard").addEventListener("click",()=>{
     M.Modal.getInstance(document.getElementById("editProfileModal")).open();
   });
