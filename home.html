@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home - Elephant Monitoring App</title>
+
+<!-- Materialize CSS -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, set, update, child, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  measurementId: "G-GSQEVX635R",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+window._fb = { db, ref, get, set, update, child, remove };
+</script>
+
+<style>
+body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
+.card-thin { padding:10px; border-radius:12px; margin:12px auto; max-width:480px; cursor:pointer; }
+.profile-pic { width:60px; height:60px; border-radius:50%; object-fit:cover; }
+.stat-card { display:flex; justify-content:space-between; padding:10px 16px; border-radius:12px; margin:12px auto; max-width:480px; }
+.stat-item { text-align:center; flex:1; }
+.stat-item h6 { margin:0; font-weight:bold; }
+.action-btns { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:480px; margin:20px auto; }
+.fixed-btn { position:fixed; bottom:20px; right:20px; }
+.ai-btn { position:fixed; bottom:20px; left:20px; background:#2e7d32; border-radius:50%; width:56px; height:56px; display:flex; align-items:center; justify-content:center; color:white; }
+</style>
+</head>
+<body>
+
+<!-- Profile Card -->
+<div class="card white card-thin" id="profileCard">
+  <div class="valign-wrapper">
+    <img id="profilePic" src="" class="profile-pic">
+    <div style="margin-left:12px;">
+      <h6 id="profileName">Loading...</h6>
+      <p id="profileEmail" class="grey-text"></p>
+      <p id="agentStatus" class="green-text"></p>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Card -->
+<div class="card white stat-card">
+  <div class="stat-item">
+    <h6 id="statElephants">0</h6>
+    <span>Elephants</span>
+  </div>
+  <div class="stat-item">
+    <h6 id="statReports">0</h6>
+    <span>Reports</span>
+  </div>
+  <div class="stat-item">
+    <h6 id="statDanger">0</h6>
+    <span>High Danger</span>
+  </div>
+  <div class="stat-item">
+    <h6 id="statDeaths">0</h6>
+    <span>Deaths</span>
+  </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="action-btns">
+  <a href="report.html" class="btn green">Report</a>
+  <a href="alert.html" class="btn red">Alert</a>
+  <a href="radar.html" class="btn blue">Radar</a>
+  <a href="analytics.html" class="btn orange">Analytics</a>
+</div>
+
+<!-- Floating Buttons -->
+<a href="report.html" class="btn-floating btn-large green fixed-btn"><i class="material-icons">add</i></a>
+<a href="chatbot.html" class="ai-btn"><i class="material-icons">smart_toy</i></a>
+
+<!-- Edit Profile Modal -->
+<div id="editProfileModal" class="modal">
+  <div class="modal-content">
+    <h5>Edit Profile</h5>
+    <div class="input-field">
+      <input type="text" id="editName">
+      <label for="editName">Name</label>
+    </div>
+    <div class="input-field">
+      <input type="email" id="editEmail">
+      <label for="editEmail">Email</label>
+    </div>
+    <div class="input-field">
+      <input type="text" id="editMobile">
+      <label for="editMobile">Mobile</label>
+    </div>
+    <div class="input-field">
+      <select id="editDistrict"></select>
+      <label>District</label>
+    </div>
+    <div class="file-field input-field">
+      <div class="btn green">
+        <span>Profile Pic</span>
+        <input type="file" id="editPic">
+      </div>
+      <div class="file-path-wrapper">
+        <input class="file-path validate" type="text">
+      </div>
+    </div>
+    <div id="agentButtonContainer"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" id="btnSaveProfile" class="modal-close btn green">Save</a>
+    <a href="#!" id="btnLogout" class="btn red">Logout</a>
+  </div>
+</div>
+
+<!-- Agent Registration Modal -->
+<div id="agentModal" class="modal">
+  <div class="modal-content">
+    <h5>Agent Registration</h5>
+    <div class="input-field"><input type="text" id="agentName"><label>Name</label></div>
+    <div class="input-field"><input type="text" id="agentNIC"><label>NIC</label></div>
+    <div class="input-field"><input type="text" id="agentPhone"><label>Phone</label></div>
+    <div class="input-field"><select id="agentDistrict"></select><label>District</label></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" id="btnRegisterAgent" class="btn green">Register</a>
+  </div>
+</div>
+
+<!-- Materialize + JS -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  M.Modal.init(document.querySelectorAll('.modal'));
+  M.FormSelect.init(document.querySelectorAll('select'));
+
+  const districts=[
+    "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"
+  ];
+  const districtSelect=document.getElementById("editDistrict");
+  const agentDistrictSelect=document.getElementById("agentDistrict");
+  districts.forEach(d=>{
+    let opt=document.createElement("option");
+    opt.value=d; opt.textContent=d;
+    districtSelect.appendChild(opt.cloneNode(true));
+    agentDistrictSelect.appendChild(opt);
+  });
+  M.FormSelect.init(document.querySelectorAll('select'));
+
+  const { db, ref, get, set, update, child, remove } = window._fb;
+
+  function getCookie(name){
+    let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)");
+    return m?m.pop():"";
+  }
+  const userId=getCookie("emaId");
+  if(!userId){window.location.href="index.html";return;}
+
+  // Load user data
+  get(child(ref(db),"users/"+userId)).then(snap=>{
+    if(snap.exists()){
+      const u=snap.val();
+      document.getElementById("profilePic").src=u.picBase64||"";
+      document.getElementById("profileName").textContent=u.name;
+      document.getElementById("profileEmail").textContent=u.email;
+      if(u.agentId){
+        document.getElementById("agentStatus").textContent="Agent Status: Agent ("+u.agentId+")";
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#!" id="btnUnregister" class="btn red">Unregister as Agent</a>';
+        document.getElementById("btnUnregister").addEventListener("click",()=>{
+          update(ref(db,"users/"+userId),{agentId:null,agentInfo:null});
+          location.reload();
+        });
+      }else{
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#agentModal" class="btn modal-trigger green">Want to be an Agent?</a>';
+        M.Modal.init(document.querySelectorAll('.modal'));
+      }
+      document.getElementById("editName").value=u.name;
+      document.getElementById("editEmail").value=u.email;
+      document.getElementById("editMobile").value=u.mobile;
+      document.getElementById("editDistrict").value=u.district;
+      M.updateTextFields();
+      M.FormSelect.init(document.querySelectorAll('select'));
+    }
+  });
+
+  // Save profile
+  document.getElementById("btnSaveProfile").addEventListener("click",async()=>{
+    const file=document.getElementById("editPic").files[0];
+    let updates={
+      name:document.getElementById("editName").value,
+      email:document.getElementById("editEmail").value,
+      mobile:document.getElementById("editMobile").value,
+      district:document.getElementById("editDistrict").value
+    };
+    if(file){
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        updates.picBase64=reader.result;
+        await update(ref(db,"users/"+userId),updates);
+        location.reload();
+      };
+      reader.readAsDataURL(file);
+    }else{
+      await update(ref(db,"users/"+userId),updates);
+      location.reload();
+    }
+  });
+
+  // Logout
+  document.getElementById("btnLogout").addEventListener("click",()=>{
+    document.cookie="emaId=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/";
+    localStorage.clear();
+    window.location.href="index.html";
+  });
+
+  // Register agent
+  document.getElementById("btnRegisterAgent").addEventListener("click",async()=>{
+    const agentId="EA-"+Math.floor(1000+Math.random()*9000);
+    const info={
+      name:document.getElementById("agentName").value,
+      nic:document.getElementById("agentNIC").value,
+      phone:document.getElementById("agentPhone").value,
+      district:document.getElementById("agentDistrict").value
+    };
+    await update(ref(db,"users/"+userId),{agentId,agentInfo:info});
+    location.reload();
+  });
+
+  // Load stats (real DB nodes expected: /stats)
+  get(ref(db,"stats")).then(snap=>{
+    if(snap.exists()){
+      const s=snap.val();
+      document.getElementById("statElephants").textContent=s.elephants||0;
+      document.getElementById("statReports").textContent=s.reports||0;
+      document.getElementById("statDanger").textContent=s.danger||0;
+      document.getElementById("statDeaths").textContent=s.deaths||0;
+    }
+  });
+
+  // Profile click → open modal
+  document.getElementById("profileCard").addEventListener("click",()=>{
+    M.Modal.getInstance(document.getElementById("editProfileModal")).open();
+  });
+});
+</script>
+</body>
+</html>
