@@ -63,8 +63,8 @@ body { font-family: Roboto, sans-serif; background:#fafafa; margin:0; padding:0;
       <label>Reason for deletion</label>
     </div>
     <div class="input-field">
-      <input type="text" id="deleteAgentName" readonly>
-      <label>Agent Name</label>
+      <input type="password" id="agentPassword" />
+      <label>Enter Agent Password</label>
     </div>
     <p>
       <label>
@@ -100,6 +100,7 @@ const firebaseConfig = {
   appId: "1:649960879930:web:d6f703cea9029a2fd14203",
   measurementId: "G-GSQEVX635R"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -125,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const userSnap = await get(child(ref(db), "users/"+userId));
   if(!userSnap.exists()) return;
   const user=userSnap.val();
-  document.getElementById("deleteAgentName").value = user.name;
+  const isAgent = user.role==="agent";
 
   const reportsContainer=document.getElementById("reportsContainer");
 
@@ -149,7 +150,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="card-actions">
           <i class="material-icons icon-btn" data-lat="${report.lat}" data-lng="${report.lng}">map</i>
           <i class="material-icons icon-btn" data-images='${JSON.stringify(report.images || [])}'>image</i>
-          <i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}" data-userid="${report.userId}">delete</i>
+          ${isAgent? `<i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}" data-userid="${report.userId}">delete</i>` : ''}
         </div></div>`;
       card.innerHTML=html;
       reportsContainer.appendChild(card);
@@ -184,7 +185,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           document.getElementById("confirmDelete").onclick=async ()=>{
             const reason=document.getElementById("deleteReason").value;
             const agreement=document.getElementById("deleteAgreement").checked;
-            if(!reason || !agreement) return alert("Select reason and agree.");
+            const password=document.getElementById("agentPassword").value;
+            if(!reason || !agreement || !password) return alert("Fill all fields and agree.");
+            const validPass = user.password; 
+            if(password!==validPass) return alert("Invalid agent password!");
             await update(ref(db,"deletedreportinfo/"+reportUserId+"/"+key),{deletedBy:user.name, agentId:user.agentId, reason, time:new Date().toLocaleString(), type});
             await remove(ref(db,"reports/"+type+"/"+key));
             deleteModal.close();
