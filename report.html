@@ -13,7 +13,7 @@ h4{text-align:center;color:#2e7d32;}
 .card{padding:12px;margin-bottom:12px;border-radius:12px;}
 .btn-full{width:100%;margin-bottom:10px;}
 .hidden{display:none!important;}
-#map{height:200px;width:100%;border-radius:12px;margin-bottom:12px;}
+#map{height:250px;width:100%;border-radius:12px;margin-bottom:12px;}
 .input-field label{font-size:0.9rem;}
 img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-radius:8px;object-fit:cover;}
 #notification{
@@ -39,6 +39,12 @@ img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-ra
 
 <form id="reportForm" class="hidden card">
   <div id="sightingFields" class="hidden">
+
+    <!-- Location selection -->
+    <p><b>Location:</b></p>
+    <button type="button" id="btnUseCurrent" class="btn grey btn-full">Use My Current Location</button>
+    <p style="text-align:center;">OR</p>
+    <p>Click on the map to select location:</p>
     <div id="map"></div>
     <p id="locationText"></p>
 
@@ -183,15 +189,28 @@ const numInput = document.getElementById("numElephants");
 document.getElementById("elePlus").addEventListener("click",()=>{numInput.value=parseInt(numInput.value)+1;});
 document.getElementById("eleMinus").addEventListener("click",()=>{if(parseInt(numInput.value)>1) numInput.value=parseInt(numInput.value)-1;});
 
-// Leaflet map & geolocation
+// Leaflet map
 let lat=0,lng=0;
-const map = L.map('map');
+const map = L.map('map').setView([7.8731,80.7718],7); // Sri Lanka center
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
-navigator.geolocation.getCurrentPosition(pos=>{
-  lat = pos.coords.latitude; lng=pos.coords.longitude;
-  map.setView([lat,lng],14);
-  L.marker([lat,lng]).addTo(map);
+
+let marker=null;
+map.on('click', function(e){
+  lat = e.latlng.lat; lng = e.latlng.lng;
+  if(marker) map.removeLayer(marker);
+  marker = L.marker([lat,lng]).addTo(map);
   document.getElementById("locationText").textContent=`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+});
+
+// Current location button
+document.getElementById("btnUseCurrent").addEventListener("click",()=>{
+  navigator.geolocation.getCurrentPosition(pos=>{
+    lat = pos.coords.latitude; lng=pos.coords.longitude;
+    map.setView([lat,lng],14);
+    if(marker) map.removeLayer(marker);
+    marker = L.marker([lat,lng]).addTo(map);
+    document.getElementById("locationText").textContent=`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+  },()=>showNotification("Unable to get location","red"));
 });
 
 // Image preview
@@ -223,9 +242,11 @@ function showNotification(msg,color="#2e7d32"){
 // Submit form
 reportForm.addEventListener("submit",async(e)=>{
   e.preventDefault();
+  if(sightingFields.classList.contains("hidden") && accidentFields.classList.contains("hidden")) return;
   const now = new Date().toLocaleString("en-US",{timeZone:"Asia/Colombo"});
   try{
     if(!sightingFields.classList.contains("hidden")){
+      if(!lat || !lng){showNotification("Select a location","red"); return;}
       const imgs = Array.from(document.getElementById("sightingImages").files).slice(0,3);
       const imgBase64 = await Promise.all(imgs.map(f=>new Promise(r=>{
         const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f);
