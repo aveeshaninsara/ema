@@ -13,12 +13,14 @@ h4{text-align:center;color:#2e7d32;}
 .card{padding:12px;margin-bottom:12px;border-radius:12px;}
 .btn-full{width:100%;margin-bottom:10px;}
 .hidden{display:none!important;}
-#map{height:250px;width:100%;border-radius:12px;margin-bottom:12px;}
+#map, #mapAccident{height:250px;width:100%;border-radius:12px;margin-bottom:12px;}
 .input-field label{font-size:0.9rem;}
 img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-radius:8px;object-fit:cover;}
 #notification{
   position:fixed;top:20px;right:20px;background:#2e7d32;color:white;padding:12px 20px;border-radius:12px;display:none;z-index:1000;
 }
+.num-selector{display:flex;align-items:center;margin-top:5px;}
+.num-selector input{width:60px;text-align:center;margin:0 5px;}
 </style>
 </head>
 <body>
@@ -50,10 +52,10 @@ img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-ra
 
     <div class="input-field">
       <label>Number of Elephants</label>
-      <div style="display:flex;align-items:center;">
-        <button type="button" id="eleMinus" class="btn grey" style="margin-right:5px;">-</button>
-        <input type="number" id="numElephants" value="1" min="1" readonly style="text-align:center;width:60px;">
-        <button type="button" id="elePlus" class="btn grey" style="margin-left:5px;">+</button>
+      <div class="num-selector">
+        <button type="button" id="eleMinus" class="btn grey">-</button>
+        <input type="number" id="numElephants" value="1" min="1" readonly>
+        <button type="button" id="elePlus" class="btn grey">+</button>
       </div>
     </div>
 
@@ -85,6 +87,14 @@ img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-ra
   </div>
 
   <div id="accidentFields" class="hidden">
+
+    <!-- Location for accident -->
+    <p><b>Location:</b></p>
+    <button type="button" id="btnUseCurrentAcc" class="btn grey btn-full">Use My Current Location</button>
+    <p style="text-align:center;">OR</p>
+    <div id="mapAccident"></div>
+    <p id="locationTextAcc"></p>
+
     <p><b>Select:</b></p>
     <label><input type="checkbox" id="accElephant"/><span>Elephant</span></label>
     <label><input type="checkbox" id="accHuman"/><span>Human</span></label>
@@ -177,11 +187,13 @@ document.getElementById("btnEleSighting").addEventListener("click",()=>{
   reportForm.classList.remove("hidden");
   sightingFields.classList.remove("hidden");
   accidentFields.classList.add("hidden");
+  setTimeout(()=>{map.invalidateSize();},100);
 });
 document.getElementById("btnAccident").addEventListener("click",()=>{
   reportForm.classList.remove("hidden");
   accidentFields.classList.remove("hidden");
   sightingFields.classList.add("hidden");
+  setTimeout(()=>{mapAcc.invalidateSize();},100);
 });
 
 // Stepper for elephants
@@ -189,11 +201,10 @@ const numInput = document.getElementById("numElephants");
 document.getElementById("elePlus").addEventListener("click",()=>{numInput.value=parseInt(numInput.value)+1;});
 document.getElementById("eleMinus").addEventListener("click",()=>{if(parseInt(numInput.value)>1) numInput.value=parseInt(numInput.value)-1;});
 
-// Leaflet map
+// Leaflet map - Sighting
 let lat=0,lng=0;
-const map = L.map('map').setView([7.8731,80.7718],7); // Sri Lanka center
+const map = L.map('map').setView([7.8731,80.7718],7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
-
 let marker=null;
 map.on('click', function(e){
   lat = e.latlng.lat; lng = e.latlng.lng;
@@ -202,14 +213,35 @@ map.on('click', function(e){
   document.getElementById("locationText").textContent=`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
 });
 
-// Current location button
+// Leaflet map - Accident
+let latAcc=0,lngAcc=0;
+const mapAcc = L.map('mapAccident').setView([7.8731,80.7718],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(mapAcc);
+let markerAcc=null;
+mapAcc.on('click', function(e){
+  latAcc = e.latlng.lat; lngAcc = e.latlng.lng;
+  if(markerAcc) mapAcc.removeLayer(markerAcc);
+  markerAcc = L.marker([latAcc,lngAcc]).addTo(mapAcc);
+  document.getElementById("locationTextAcc").textContent=`Lat: ${latAcc.toFixed(5)}, Lng: ${lngAcc.toFixed(5)}`;
+});
+
+// Current location buttons
 document.getElementById("btnUseCurrent").addEventListener("click",()=>{
   navigator.geolocation.getCurrentPosition(pos=>{
-    lat = pos.coords.latitude; lng=pos.coords.longitude;
+    lat = pos.coords.latitude; lng = pos.coords.longitude;
     map.setView([lat,lng],14);
     if(marker) map.removeLayer(marker);
     marker = L.marker([lat,lng]).addTo(map);
     document.getElementById("locationText").textContent=`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+  },()=>showNotification("Unable to get location","red"));
+});
+document.getElementById("btnUseCurrentAcc").addEventListener("click",()=>{
+  navigator.geolocation.getCurrentPosition(pos=>{
+    latAcc = pos.coords.latitude; lngAcc = pos.coords.longitude;
+    mapAcc.setView([latAcc,lngAcc],14);
+    if(markerAcc) mapAcc.removeLayer(markerAcc);
+    markerAcc = L.marker([latAcc,lngAcc]).addTo(mapAcc);
+    document.getElementById("locationTextAcc").textContent=`Lat: ${latAcc.toFixed(5)}, Lng: ${lngAcc.toFixed(5)}`;
   },()=>showNotification("Unable to get location","red"));
 });
 
@@ -264,6 +296,7 @@ reportForm.addEventListener("submit",async(e)=>{
       const newRef = push(ref(db,"reports/sightings"));
       await set(newRef,reportData);
     } else {
+      if(!latAcc || !lngAcc){showNotification("Select a location","red"); return;}
       const imgs = Array.from(document.getElementById("accidentImages").files).slice(0,3);
       const imgBase64 = await Promise.all(imgs.map(f=>new Promise(r=>{
         const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f);
@@ -271,6 +304,7 @@ reportForm.addEventListener("submit",async(e)=>{
       const reportData = {
         userId,userName,userMobile,
         time: now,
+        lat: latAcc, lng: lngAcc,
         elephant: document.getElementById("accElephant").checked,
         human: document.getElementById("accHuman").checked,
         singleOrGroup: document.querySelector('input[name="eleGroup"]:checked')?.value || "",
