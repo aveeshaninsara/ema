@@ -4,17 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Elephant Monitoring App</title>
-
-<!-- Materialize CSS -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-
-<!-- QRCode JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-<!-- HTML5 QR Scanner -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
@@ -50,12 +42,11 @@ canvas#idCardCanvas{border:2px solid #2e7d32;border-radius:8px;display:block;mar
 </head>
 <body>
 
-<!-- Splash -->
 <div class="splash">
 <img src="https://i.ibb.co/jvN2hV16/logo.png" alt="Logo" width="160" height="160">
 </div>
 
-<!-- Login Screen -->
+
 <main id="loginScreen" class="container" style="margin-top:48px;">
 <h4 class="center brand-green">Login</h4>
 <div class="row">
@@ -80,7 +71,7 @@ canvas#idCardCanvas{border:2px solid #2e7d32;border-radius:8px;display:block;mar
 </div>
 </main>
 
-<!-- Register Screen -->
+
 <section id="registerScreen" class="container hidden" style="margin-top:36px;">
 <h4 class="center brand-green">Register</h4>
 <div class="row">
@@ -122,7 +113,7 @@ canvas#idCardCanvas{border:2px solid #2e7d32;border-radius:8px;display:block;mar
 </div>
 </section>
 
-<!-- Forgot ID Screen -->
+
 <section id="forgotScreen" class="container hidden" style="margin-top:36px;">
 <h4 class="center brand-green">Recover ID</h4>
 <div class="row">
@@ -142,7 +133,6 @@ canvas#idCardCanvas{border:2px solid #2e7d32;border-radius:8px;display:block;mar
 </div>
 </section>
 
-<!-- QR Login Popup -->
 <div id="qrLoginBackdrop" class="hidden">
 <div id="qrModal">
 <h5 class="brand-green" style="margin-top:0;">Scan QR</h5>
@@ -195,7 +185,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   const isValidMobile=m=>/^07\d{8}$/.test(m);
   function persistAndGoHome(id){localStorage.setItem("emaId",id);document.cookie="emaId="+id;window.location.href="home.html?id="+encodeURIComponent(id);}
 
-  // Fast load
+
   const savedId=localStorage.getItem("emaId")||document.cookie.replace(/(?:(?:^|.*;\s*)emaId\s*\=\s*([^;]*).*$)|^.*$/,"$1");
   if(savedId){persistAndGoHome(savedId);}
 
@@ -210,7 +200,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     persistAndGoHome(id);
   });
 
-  // QR Login
+ 
   let qrScanner=null;
   btnQRLogin.addEventListener("click",()=>{
     qrBackdrop.classList.remove("hidden");
@@ -222,7 +212,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
   btnCloseQR.addEventListener("click",()=>{if(qrScanner)qrScanner.stop().then(()=>qrScanner.clear()).catch(()=>{});qrBackdrop.classList.add("hidden");});
 
-  // Register
+
   btnRegister.addEventListener("click",async()=>{
     const name=regName.value.trim(),email=regEmail.value.trim(),mobile=regMobile.value.trim(),district=regDistrict.value.trim(),file=regPic.files[0];
     if(!name||!email||!mobile||!district||!file)return toast("Fill all fields & upload picture");
@@ -235,7 +225,6 @@ document.addEventListener("DOMContentLoaded",()=>{
       const emaId=makeEMAId();
       await set(ref(db,"users/"+emaId),{name,email,mobile,district,picBase64});
 
-      // Create ID card canvas
       const canvas=document.createElement("canvas");canvas.width=640;canvas.height=360;
       const ctx=canvas.getContext("2d");
       ctx.fillStyle="#2e7d32";ctx.fillRect(0,0,640,360);
@@ -253,17 +242,17 @@ document.addEventListener("DOMContentLoaded",()=>{
         ctx.fillText("EMA ID: "+emaId,160,80);ctx.fillText(name,160,120);
         ctx.fillText(email,160,160);ctx.fillText(mobile,160,200);ctx.fillText(district,160,240);
 
-        // QR code
+      
         const qrDiv=document.createElement("div");new QRCode(qrDiv,{text:emaId,width:120,height:120});
         const qrCanvas=qrDiv.querySelector("canvas");ctx.drawImage(qrCanvas,500,50,120,120);
 
         idCardOutput.innerHTML="";idCardOutput.appendChild(canvas);
 
-        // Download button
+     
         const btnDownload=document.createElement("a");btnDownload.className="btn brand";btnDownload.innerText="Download ID";
         btnDownload.href=canvas.toDataURL();btnDownload.download=emaId+".png";idCardOutput.appendChild(btnDownload);
 
-        // Go to Home button
+     
         const btnHome=document.createElement("button");btnHome.className="btn green";btnHome.innerText="Go to Home";
         btnHome.style.marginLeft="12px";
         btnHome.onclick=()=>persistAndGoHome(emaId);
@@ -275,7 +264,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     }catch(e){console.error(e);toast("Registration failed");}
   });
 
-  // Forgot ID
+
   btnFindId.addEventListener("click",async()=>{
     const email=fEmail.value.trim(),mobile=fMobile.value.trim();
     if(!isValidEmail(email)||!isValidMobile(mobile))return toast("Enter valid email & mobile");
