@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report - Elephant Monitoring App</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+body{font-family:Roboto,sans-serif;background:#fafafa;margin:0;padding:0;}
+.container{max-width:480px;margin:0 auto;padding:10px;}
+h4{text-align:center;color:#2e7d32;}
+.card{padding:12px;margin-bottom:12px;border-radius:12px;}
+.btn-full{width:100%;margin-bottom:10px;}
+.hidden{display:none!important;}
+#map{height:200px;width:100%;border-radius:12px;margin-bottom:12px;}
+.input-field label{font-size:0.9rem;}
+img.preview-img{width:70px;height:70px;margin-right:5px;margin-top:5px;border-radius:8px;object-fit:cover;}
+#notification{
+  position:fixed;top:20px;right:20px;background:#2e7d32;color:white;padding:12px 20px;border-radius:12px;display:none;z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<div id="notification"></div>
+
+<div class="container">
+<h4>Submit Report</h4>
+
+<div class="card">
+  <a href="home.html" class="btn green btn-full">Home</a>
+</div>
+
+<div class="card">
+  <button id="btnEleSighting" class="btn green btn-full">Elephant Sighting</button>
+  <button id="btnAccident" class="btn red btn-full">Elephant/Human Accident</button>
+</div>
+
+<form id="reportForm" class="hidden card">
+  <div id="sightingFields" class="hidden">
+    <div id="map"></div>
+    <p id="locationText"></p>
+
+    <div class="input-field">
+      <label>Number of Elephants</label>
+      <div style="display:flex;align-items:center;">
+        <button type="button" id="eleMinus" class="btn grey" style="margin-right:5px;">-</button>
+        <input type="number" id="numElephants" value="1" min="1" readonly style="text-align:center;width:60px;">
+        <button type="button" id="elePlus" class="btn grey" style="margin-left:5px;">+</button>
+      </div>
+    </div>
+
+    <div class="input-field">
+      <select id="dangerLevel">
+        <option value="" disabled selected>Choose danger level</option>
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+      <label>Danger Level</label>
+    </div>
+
+    <div class="file-field input-field">
+      <div class="btn green"><span>Upload Images</span><input type="file" id="sightingImages" accept="image/*" multiple></div>
+      <div class="file-path-wrapper"><input class="file-path validate" type="text" placeholder="Select up to 3 images"></div>
+      <div id="previewSighting"></div>
+    </div>
+
+    <div class="input-field">
+      <select id="sightingDistrict"></select>
+      <label>District</label>
+    </div>
+
+    <div class="input-field">
+      <textarea id="sightingDesc" class="materialize-textarea"></textarea>
+      <label for="sightingDesc">Brief Description</label>
+    </div>
+  </div>
+
+  <div id="accidentFields" class="hidden">
+    <p><b>Select:</b></p>
+    <label><input type="checkbox" id="accElephant"/><span>Elephant</span></label>
+    <label><input type="checkbox" id="accHuman"/><span>Human</span></label>
+
+    <div id="groupEle" class="hidden">
+      <p>Elephant: Single or Group</p>
+      <label><input type="radio" name="eleGroup" value="Single"/><span>Single</span></label>
+      <label><input type="radio" name="eleGroup" value="Group"/><span>Group</span></label>
+    </div>
+
+    <div id="eleType" class="hidden">
+      <p>Elephant Type</p>
+      <label><input type="radio" name="eleType" value="Elephant"/><span>Elephant</span></label>
+      <label><input type="radio" name="eleType" value="Tusker"/><span>Tusker</span></label>
+    </div>
+
+    <div class="file-field input-field">
+      <div class="btn red"><span>Upload Images</span><input type="file" id="accidentImages" accept="image/*" multiple></div>
+      <div class="file-path-wrapper"><input class="file-path validate" type="text" placeholder="Select up to 3 images"></div>
+      <div id="previewAccident"></div>
+    </div>
+
+    <div class="input-field">
+      <select id="accidentDistrict"></select>
+      <label>District</label>
+    </div>
+
+    <p>
+      <label><input type="checkbox" id="criticalStatus"/><span>Critical Status</span></label>
+    </p>
+  </div>
+
+  <button type="submit" class="btn green btn-full">Submit Report</button>
+</form>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, set, child, get, push } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  measurementId: "G-GSQEVX635R",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const districts = [
+    "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"
+];
+
+const sightingDistrict = document.getElementById("sightingDistrict");
+const accidentDistrict = document.getElementById("accidentDistrict");
+districts.forEach(d=>{
+  let opt1 = document.createElement("option"); opt1.value=d; opt1.textContent=d; sightingDistrict.appendChild(opt1);
+  let opt2 = document.createElement("option"); opt2.value=d; opt2.textContent=d; accidentDistrict.appendChild(opt2);
+});
+M.FormSelect.init(document.querySelectorAll("select"));
+
+// User id from cookie
+function getCookie(name){
+  let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)");
+  return m?m.pop():"";
+}
+const userId=getCookie("emaId");
+if(!userId){window.location.href="index.html";}
+
+// Get user info
+let userName="", userMobile="";
+get(child(ref(db),"users/"+userId)).then(snap=>{
+  if(snap.exists()){
+    const u=snap.val();
+    userName = u.name; userMobile = u.mobile;
+  }
+});
+
+// Show selected form
+const reportForm=document.getElementById("reportForm");
+const sightingFields=document.getElementById("sightingFields");
+const accidentFields=document.getElementById("accidentFields");
+document.getElementById("btnEleSighting").addEventListener("click",()=>{
+  reportForm.classList.remove("hidden");
+  sightingFields.classList.remove("hidden");
+  accidentFields.classList.add("hidden");
+});
+document.getElementById("btnAccident").addEventListener("click",()=>{
+  reportForm.classList.remove("hidden");
+  accidentFields.classList.remove("hidden");
+  sightingFields.classList.add("hidden");
+});
+
+// Stepper for elephants
+const numInput = document.getElementById("numElephants");
+document.getElementById("elePlus").addEventListener("click",()=>{numInput.value=parseInt(numInput.value)+1;});
+document.getElementById("eleMinus").addEventListener("click",()=>{if(parseInt(numInput.value)>1) numInput.value=parseInt(numInput.value)-1;});
+
+// Leaflet map & geolocation
+let lat=0,lng=0;
+const map = L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+navigator.geolocation.getCurrentPosition(pos=>{
+  lat = pos.coords.latitude; lng=pos.coords.longitude;
+  map.setView([lat,lng],14);
+  L.marker([lat,lng]).addTo(map);
+  document.getElementById("locationText").textContent=`Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+});
+
+// Image preview
+function handlePreview(input, container){
+  container.innerHTML="";
+  const files = Array.from(input.files).slice(0,3);
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=()=>{ const img=document.createElement("img"); img.src=reader.result; img.className="preview-img"; container.appendChild(img);}
+    reader.readAsDataURL(file);
+  });
+}
+document.getElementById("sightingImages").addEventListener("change",(e)=>handlePreview(e.target,document.getElementById("previewSighting")));
+document.getElementById("accidentImages").addEventListener("change",(e)=>handlePreview(e.target,document.getElementById("previewAccident")));
+
+// Accident dynamic fields
+document.getElementById("accElephant").addEventListener("change",(e)=>{document.getElementById("groupEle").classList.toggle("hidden",!e.target.checked);document.getElementById("eleType").classList.toggle("hidden",!e.target.checked);});
+document.getElementById("accHuman").addEventListener("change",(e)=>{if(e.target.checked && !document.getElementById("accElephant").checked){document.getElementById("groupEle").classList.add("hidden");document.getElementById("eleType").classList.add("hidden");}});
+
+// Notification function
+function showNotification(msg,color="#2e7d32"){
+  const n=document.getElementById("notification");
+  n.style.background=color;
+  n.textContent=msg;
+  n.style.display="block";
+  setTimeout(()=>{n.style.display="none";},3000);
+}
+
+// Submit form
+reportForm.addEventListener("submit",async(e)=>{
+  e.preventDefault();
+  const now = new Date().toLocaleString("en-US",{timeZone:"Asia/Colombo"});
+  try{
+    if(!sightingFields.classList.contains("hidden")){
+      const imgs = Array.from(document.getElementById("sightingImages").files).slice(0,3);
+      const imgBase64 = await Promise.all(imgs.map(f=>new Promise(r=>{
+        const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f);
+      })));
+      const reportData = {
+        userId,userName,userMobile,
+        time: now,
+        lat,lng,
+        numElephants: parseInt(numInput.value),
+        dangerLevel: document.getElementById("dangerLevel").value,
+        images: imgBase64,
+        district: document.getElementById("sightingDistrict").value,
+        description: document.getElementById("sightingDesc").value
+      };
+      const newRef = push(ref(db,"reports/sightings"));
+      await set(newRef,reportData);
+    } else {
+      const imgs = Array.from(document.getElementById("accidentImages").files).slice(0,3);
+      const imgBase64 = await Promise.all(imgs.map(f=>new Promise(r=>{
+        const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f);
+      })));
+      const reportData = {
+        userId,userName,userMobile,
+        time: now,
+        elephant: document.getElementById("accElephant").checked,
+        human: document.getElementById("accHuman").checked,
+        singleOrGroup: document.querySelector('input[name="eleGroup"]:checked')?.value || "",
+        eleType: document.querySelector('input[name="eleType"]:checked')?.value || "",
+        critical: document.getElementById("criticalStatus").checked,
+        images: imgBase64,
+        district: document.getElementById("accidentDistrict").value
+      };
+      const newRef = push(ref(db,"reports/accidents"));
+      await set(newRef,reportData);
+    }
+    showNotification("Report submitted successfully!");
+    setTimeout(()=>{window.location.href="home.html";},1500);
+  }catch(err){
+    showNotification("Failed to submit report!","red");
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>
