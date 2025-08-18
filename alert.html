@@ -2,307 +2,307 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Alerts</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts</title>
 
   <!-- Materialize CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-  <!-- Material Icons -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
+  <!-- Leaflet Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    body { background:#f5f5f5; }
-    .card { margin: 10px 0; }
-    .expandable-content { display:none; margin-top:10px; }
-    .report-image { width:100%; margin-bottom:10px; border-radius:8px; }
-    #mapContainer { height:300px; width:100%; }
-    .btn-small { margin:3px 2px; }
-    .floating-btn { position:fixed; bottom:20px; right:20px; z-index:1000; }
+    body { background: #f9f9f9; font-family: Arial, sans-serif; }
+    .filter-bar { margin: 15px; }
+    .report-card { margin: 10px; border-radius: 12px; }
+    .map-popup { height: 300px; }
+    .icon-btn { margin-right: 10px; cursor: pointer; }
+    .delete-btn { margin-top: 10px; }
+    .floating-btn { position: fixed; bottom: 20px; right: 20px; }
+    .modal { max-height: 90% !important; }
   </style>
 </head>
 <body>
 
-  <nav class="blue">
-    <div class="nav-wrapper">
-      <a href="#!" class="brand-logo center">Alerts</a>
+  <!-- Filter Bar -->
+  <div class="filter-bar row">
+    <div class="input-field col s6">
+      <select id="filterType">
+        <option value="sightings" selected>Sightings</option>
+        <option value="accidents">Accidents</option>
+      </select>
+      <label>Report Type</label>
     </div>
-  </nav>
-
-  <div class="container">
-    <div class="section center">
-      <a id="btnWhyNotShowing" class="btn orange">Why is my report not showing?</a>
-    </div>
-
-    <div class="input-field">
-      <select id="districtFilter">
-        <option value="">All Districts</option>
-        <option>Ampara</option><option>Anuradhapura</option><option>Badulla</option><option>Batticaloa</option>
-        <option>Colombo</option><option>Galle</option><option>Gampaha</option><option>Hambantota</option>
-        <option>Jaffna</option><option>Kalutara</option><option>Kandy</option><option>Kegalle</option>
-        <option>Kilinochchi</option><option>Kurunegala</option><option>Mannar</option><option>Matale</option>
-        <option>Matara</option><option>Monaragala</option><option>Mullaitivu</option><option>Nuwara Eliya</option>
-        <option>Polonnaruwa</option><option>Puttalam</option><option>Ratnapura</option><option>Trincomalee</option>
+    <div class="input-field col s6">
+      <select id="filterDistrict">
+        <option value="all" selected>All Districts</option>
+        <option>Ampara</option>
+        <option>Anuradhapura</option>
+        <option>Badulla</option>
+        <option>Batticaloa</option>
+        <option>Colombo</option>
+        <option>Galle</option>
+        <option>Gampaha</option>
+        <option>Hambantota</option>
+        <option>Jaffna</option>
+        <option>Kalutara</option>
+        <option>Kandy</option>
+        <option>Kegalle</option>
+        <option>Kilinochchi</option>
+        <option>Kurunegala</option>
+        <option>Mannar</option>
+        <option>Matale</option>
+        <option>Matara</option>
+        <option>Monaragala</option>
+        <option>Mullaitivu</option>
+        <option>Nuwara Eliya</option>
+        <option>Polonnaruwa</option>
+        <option>Puttalam</option>
+        <option>Ratnapura</option>
+        <option>Trincomalee</option>
         <option>Vavuniya</option>
       </select>
-      <label>Filter by District</label>
+      <label>District</label>
     </div>
+  </div>
 
-    <h5 class="blue-text">Sightings</h5>
-    <div id="sightingsContainer"></div>
+  <!-- Why my report not showing -->
+  <div class="center-align">
+    <a class="btn red lighten-1 modal-trigger" href="#deletedReportsModal">Why is my report not showing?</a>
+  </div>
 
-    <h5 class="red-text">Accidents</h5>
-    <div id="accidentsContainer"></div>
+  <!-- Reports Container -->
+  <div id="reportsContainer" class="container"></div>
+
+  <!-- Deleted Reports Modal -->
+  <div id="deletedReportsModal" class="modal">
+    <div class="modal-content">
+      <h5>Deleted Reports</h5>
+      <ul id="deletedReportsList" class="collection"></ul>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn-flat">Close</a>
+    </div>
   </div>
 
   <!-- Map Modal -->
   <div id="mapModal" class="modal">
-    <div class="modal-content"><h5>Location</h5><div id="mapContainer"></div></div>
-    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
+    <div class="modal-content">
+      <h5>Report Location</h5>
+      <div id="map" class="map-popup"></div>
+    </div>
   </div>
 
-  <!-- Images Modal -->
+  <!-- Image Modal -->
   <div id="imageModal" class="modal">
-    <div class="modal-content"><h5>Images</h5><div id="imageModalContent"></div></div>
-    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
+    <div class="modal-content">
+      <h5>Report Images</h5>
+      <div id="imageContainer"></div>
+    </div>
   </div>
 
-  <!-- Delete Modal -->
+  <!-- Delete Report Modal -->
   <div id="deleteModal" class="modal">
     <div class="modal-content">
       <h5>Delete Report</h5>
       <div class="input-field">
         <select id="deleteReason">
-          <option value="Fake Report">Fake Report</option>
+          <option value="Fake report">Fake report</option>
           <option value="Miscontent">Miscontent</option>
-          <option value="Fraud Information">Fraud Information</option>
-          <option value="Description is Fake">Description is Fake</option>
-          <option value="Duplicate Report">Duplicate Report</option>
+          <option value="Fraud information">Fraud information</option>
+          <option value="Description is fake">Description is fake</option>
+          <option value="Duplicate report">Duplicate report</option>
           <option value="Other">Other</option>
         </select>
         <label>Reason</label>
       </div>
       <div class="input-field">
-        <input id="deleteAgentName" type="text" readonly>
-        <label for="deleteAgentName">Agent Name</label>
+        <input id="agentId" type="text" placeholder="Enter your Agent ID">
+        <label for="agentId">Agent ID</label>
       </div>
-      <div class="input-field">
-        <input id="deleteAgentId" type="text" readonly>
-        <label for="deleteAgentId">Agent ID</label>
-      </div>
-      <label>
-        <input type="checkbox" id="deleteAgreement">
-        <span>I agree this information is correct and I will not harass anyone</span>
-      </label>
-    </div>
-    <div class="modal-footer">
-      <a href="#!" id="btnConfirmDelete" class="btn red">Delete</a>
-      <a href="#!" class="modal-close btn-flat">Cancel</a>
+      <p>
+        <label>
+          <input type="checkbox" id="deleteAgreement">
+          <span>I agree this information is correct and not harassment</span>
+        </label>
+      </p>
+      <button class="btn red" id="confirmDeleteBtn">Delete</button>
     </div>
   </div>
 
-  <!-- Deleted Reports Modal -->
-  <div id="deletedModal" class="modal">
-    <div class="modal-content">
-      <h5>Deleted Reports</h5>
-      <div id="deletedReportsContainer"></div>
-    </div>
-    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
-  </div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <!-- Firebase & Libs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Materialize JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
   <script>
-    // TODO: replace with your firebase config
+    // ---- FIREBASE CONFIG ----
     const firebaseConfig = {
-      apiKey: "YOUR_KEY",
-      authDomain: "YOUR_APP.firebaseapp.com",
-      databaseURL: "https://YOUR_APP.firebaseio.com",
-      projectId: "YOUR_APP",
-      storageBucket: "YOUR_APP.appspot.com",
-      messagingSenderId: "123456789",
+      apiKey: "YOUR_API_KEY",
+      authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+      databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "elephant-monitoring-app-99ffd",
+      storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
       appId: "YOUR_APP_ID"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Fake current user (replace with cookie/localStorage)
-    const userData = JSON.parse(localStorage.getItem("userData")) || {
-      name:"Aveesha Ninsara", mobile:"0771850503", agentId:"EA-42DNDC"
-    };
-
-    document.addEventListener("DOMContentLoaded", function(){
+    // ---- INIT ----
+    document.addEventListener('DOMContentLoaded', function() {
       M.AutoInit();
       loadReports();
-
-      document.getElementById("districtFilter").addEventListener("change", loadReports);
-      document.getElementById("btnWhyNotShowing").addEventListener("click", loadDeletedReports);
     });
 
-    function within24h(timeStr){
-      const t = new Date(timeStr);
-      return (Date.now()-t.getTime()) < (24*60*60*1000);
-    }
+    // ---- LOAD REPORTS ----
+    async function loadReports() {
+      const type = document.getElementById("filterType").value;
+      const district = document.getElementById("filterDistrict").value;
+      const reportsContainer = document.getElementById("reportsContainer");
+      reportsContainer.innerHTML = "<p class='center'>Loading...</p>";
 
-    async function loadReports(){
-      document.getElementById("sightingsContainer").innerHTML="";
-      document.getElementById("accidentsContainer").innerHTML="";
-      const districtFilter = document.getElementById("districtFilter").value;
+      const snapshot = await db.ref("reports/" + type).get();
+      reportsContainer.innerHTML = "";
 
-      const types=["sightings","accidents"];
-      for(const type of types){
-        const snap = await db.ref("reports/"+type).get();
-        if(!snap.exists()) continue;
-        snap.forEach(r=>{
-          const rep = r.val();
-          if(!within24h(rep.time)) return;
-          if(districtFilter && rep.district!==districtFilter) return;
-          renderReportCard(type,r.key,rep);
-        });
-      }
-    }
+      snapshot.forEach(child => {
+        const report = child.val();
+        const id = child.key;
 
-    function renderReportCard(type,key,report){
-      const container = type==="sightings" ? document.getElementById("sightingsContainer") : document.getElementById("accidentsContainer");
-      const card = document.createElement("div");
-      card.className="card";
-      const cardContent = document.createElement("div");
-      cardContent.className="card-content";
-      cardContent.innerHTML=`
-        <span class="card-title activator">${report.description}<i class="material-icons right">expand_more</i></span>
-        <p><strong>District:</strong> ${report.district}</p>
-        <p><strong>Reporter:</strong> ${report.userName}</p>
-      `;
-      const exp = document.createElement("div");
-      exp.className="expandable-content";
+        // Only show last 24 hours
+        const reportTime = new Date(report.time);
+        if (Date.now() - reportTime.getTime() > 24 * 60 * 60 * 1000) return;
 
-      // Map button
-      if(report.lat && report.lng){
-        const mapBtn=document.createElement("a");
-        mapBtn.className="btn blue btn-small";
-        mapBtn.innerHTML='<i class="material-icons">map</i>';
-        mapBtn.onclick=()=>{
-          const modal=M.Modal.getInstance(document.getElementById("mapModal"));
-          modal.open();
-          setTimeout(()=>{
-            document.getElementById("mapContainer").innerHTML="";
-            const map=L.map("mapContainer").setView([report.lat,report.lng],13);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
-            L.marker([report.lat,report.lng]).addTo(map).bindPopup(report.description).openPopup();
-          },200);
-        };
-        exp.appendChild(mapBtn);
-      }
+        if (district !== "all" && report.district !== district) return;
 
-      // Images button
-      if(report.images){
-        const imgBtn=document.createElement("a");
-        imgBtn.className="btn orange btn-small";
-        imgBtn.innerHTML='<i class="material-icons">image</i>';
-        imgBtn.onclick=()=>{
-          const modal=M.Modal.getInstance(document.getElementById("imageModal"));
-          const cont=document.getElementById("imageModalContent");
-          cont.innerHTML="";
-          report.images.forEach(url=>{
-            const im=document.createElement("img"); im.src=url; im.className="report-image";
-            cont.appendChild(im);
-          });
-          modal.open();
-        };
-        exp.appendChild(imgBtn);
-      }
+        const card = document.createElement("div");
+        card.className = "card report-card";
 
-      // PDF button
-      const pdfBtn=document.createElement("a");
-      pdfBtn.className="btn green btn-small";
-      pdfBtn.textContent="PDF";
-      pdfBtn.onclick=()=>{
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.text("Report",10,10);
-        doc.text("Description: "+report.description,10,20);
-        doc.text("District: "+report.district,10,30);
-        doc.text("Reporter: "+report.userName,10,40);
-        doc.save("report-"+key+".pdf");
-      };
-      exp.appendChild(pdfBtn);
-
-      // Delete button (if agent)
-      if(userData.agentId){
-        const delBtn=document.createElement("a");
-        delBtn.className="btn red btn-small modal-trigger";
-        delBtn.href="#deleteModal";
-        delBtn.textContent="Delete";
-        delBtn.onclick=()=>{
-          document.getElementById("deleteAgentName").value=userData.name;
-          document.getElementById("deleteAgentId").value=userData.agentId;
-          document.getElementById("btnConfirmDelete").dataset.reportKey=key;
-          document.getElementById("btnConfirmDelete").dataset.reportType=type;
-        };
-        exp.appendChild(delBtn);
-      }
-
-      card.appendChild(cardContent);
-      card.appendChild(exp);
-      container.appendChild(card);
-
-      cardContent.querySelector(".activator").onclick=()=>{
-        exp.style.display=exp.style.display==="block"?"none":"block";
-      };
-    }
-
-    document.getElementById("btnConfirmDelete").onclick=async ()=>{
-      const reason=document.getElementById("deleteReason").value;
-      const agentName=document.getElementById("deleteAgentName").value;
-      const agentId=document.getElementById("deleteAgentId").value;
-      const agree=document.getElementById("deleteAgreement").checked;
-      if(!agree){M.toast({html:"Agree before deleting"});return;}
-      const key=this.dataset.reportKey;
-      const type=this.dataset.reportType;
-      const snap=await db.ref("reports/"+type+"/"+key).get();
-      if(!snap.exists()){M.toast({html:"Report missing"});return;}
-      const rep=snap.val();
-      await db.ref("deletedreportinfo/"+rep.userId+"/"+key).set({
-        ...rep, reason, agentName, agentId, agentMobile:userData.mobile, deletedAt:new Date().toString()
+        card.innerHTML = `
+          <div class="card-content">
+            <span class="card-title">${report.district} - ${report.dangerLevel}</span>
+            <p>${report.description}</p>
+            <div class="section">
+              <i class="fas fa-map-marker-alt icon-btn" onclick="showMap(${report.lat}, ${report.lng})"></i>
+              <i class="fas fa-image icon-btn" onclick='showImages(${JSON.stringify(report.images || [])})'></i>
+              <i class="fas fa-file-pdf icon-btn" onclick='downloadPDF(${JSON.stringify(report)})'></i>
+            </div>
+            ${isAgent() ? `<button class="btn red delete-btn modal-trigger" href="#deleteModal" onclick="prepareDelete('${type}', '${id}', '${report.userId}', '${report.userName}', '${report.userMobile}')">Delete</button>` : ""}
+          </div>
+        `;
+        reportsContainer.appendChild(card);
       });
-      await db.ref("reports/"+type+"/"+key).remove();
+    }
+
+    // ---- MAP ----
+    let map;
+    function showMap(lat, lng) {
+      const modal = M.Modal.getInstance(document.getElementById("mapModal"));
+      modal.open();
+      setTimeout(() => {
+        if (!map) {
+          map = L.map("map").setView([lat, lng], 10);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        }
+        map.setView([lat, lng], 12);
+        L.marker([lat, lng]).addTo(map);
+      }, 300);
+    }
+
+    // ---- IMAGES ----
+    function showImages(images) {
+      const container = document.getElementById("imageContainer");
+      container.innerHTML = "";
+      (images || []).forEach(url => {
+        const img = document.createElement("img");
+        img.src = url;
+        img.style.width = "100%";
+        img.className = "responsive-img";
+        container.appendChild(img);
+      });
+      M.Modal.getInstance(document.getElementById("imageModal")).open();
+    }
+
+    // ---- PDF ----
+    function downloadPDF(report) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text(`District: ${report.district}`, 10, 10);
+      doc.text(`Danger Level: ${report.dangerLevel}`, 10, 20);
+      doc.text(`Description: ${report.description}`, 10, 30);
+      doc.text(`Time: ${report.time}`, 10, 40);
+      doc.save("report.pdf");
+    }
+
+    // ---- DELETE REPORT ----
+    let deleteContext = {};
+    function prepareDelete(type, id, userId, userName, userMobile) {
+      deleteContext = { type, id, userId, userName, userMobile };
+    }
+
+    document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
+      const reason = document.getElementById("deleteReason").value;
+      const agentId = document.getElementById("agentId").value;
+      const agreed = document.getElementById("deleteAgreement").checked;
+
+      if (!reason || !agentId || !agreed) {
+        alert("Fill all fields and agree!");
+        return;
+      }
+
+      const { type, id, userId, userName, userMobile } = deleteContext;
+      const agentName = localStorage.getItem("userName") || "Unknown";
+
+      // Save to deleted reports
+      await db.ref(`deletedreportinfo/${userId}/${id}`).set({
+        reason, agentId, agentName, userName, userMobile, deletedAt: new Date().toISOString()
+      });
+
+      // Remove from reports
+      await db.ref(`reports/${type}/${id}`).remove();
+
       M.Modal.getInstance(document.getElementById("deleteModal")).close();
       loadReports();
-      M.toast({html:"Deleted"});
-    };
+    });
 
-    async function loadDeletedReports(){
-      const cont=document.getElementById("deletedReportsContainer");
-      cont.innerHTML="";
-      const snap=await db.ref("deletedreportinfo").get();
-      if(!snap.exists()){cont.innerHTML="<p>No deleted reports.</p>";}
-      snap.forEach(user=>{
-        user.forEach(rep=>{
-          const r=rep.val();
-          const div=document.createElement("div");
-          div.className="card";
-          div.innerHTML=`
-            <div class="card-content">
-              <span class="card-title">${r.description}</span>
-              <p><strong>Reason:</strong> ${r.reason}</p>
-              <p><strong>Deleted by:</strong> ${r.agentName} (${r.agentId})</p>
-              <p><strong>Contact:</strong> <a href="tel:${r.agentMobile}" class="blue-text copyable">${r.agentMobile}</a></p>
-            </div>`;
-          cont.appendChild(div);
+    // ---- DELETED REPORTS ----
+    document.querySelector("#deletedReportsModal").addEventListener("click", async () => {
+      const list = document.getElementById("deletedReportsList");
+      list.innerHTML = "<li class='collection-item'>Loading...</li>";
+
+      const snapshot = await db.ref("deletedreportinfo").get();
+      list.innerHTML = "";
+      snapshot.forEach(user => {
+        user.forEach(report => {
+          const val = report.val();
+          const li = document.createElement("li");
+          li.className = "collection-item";
+          li.innerHTML = `
+            <b>Reason:</b> ${val.reason}<br>
+            <b>Agent:</b> ${val.agentName} (${val.agentId})<br>
+            <b>Contact:</b> <a href="tel:${val.userMobile}">${val.userMobile}</a>
+          `;
+          list.appendChild(li);
         });
       });
-      M.Modal.getInstance(document.getElementById("deletedModal")).open();
+    });
 
-      document.querySelectorAll(".copyable").forEach(el=>{
-        el.onclick=(e)=>{e.preventDefault();navigator.clipboard.writeText(el.textContent);M.toast({html:"Copied!"});};
-      });
+    // ---- IS AGENT ----
+    function isAgent() {
+      return localStorage.getItem("isAgent") === "true";
     }
+
+    // Reload reports when filters change
+    document.getElementById("filterType").addEventListener("change", loadReports);
+    document.getElementById("filterDistrict").addEventListener("change", loadReports);
   </script>
 </body>
 </html>
