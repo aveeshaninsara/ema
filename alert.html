@@ -78,6 +78,14 @@ body { font-family: Roboto, sans-serif; background:#fafafa; margin:0; padding:0;
   </div>
 </div>
 
+<div id="whyModal" class="modal">
+  <div class="modal-content">
+    <h5>Deleted Reports</h5>
+    <div id="deletedContainer"></div>
+  </div>
+  <div class="modal-footer"><a href="#!" class="modal-close btn red">Close</a></div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getDatabase, ref, get, child, update, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
@@ -106,18 +114,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const Mscript = document.createElement("script");
   Mscript.src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js";
   document.body.appendChild(Mscript);
-  Mscript.onload = ()=>{ M.FormSelect.init(document.querySelectorAll('select')); M.Modal.init(document.querySelectorAll('.modal'));};
+  Mscript.onload = ()=>{
+    M.FormSelect.init(document.querySelectorAll('select'));
+    M.Modal.init(document.querySelectorAll('.modal'));
+  };
 
   function getCookie(name){ let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)"); return m?m.pop():"";}
   const userId=getCookie("emaId");
   if(!userId){ window.location.href="index.html"; return;}
-
   const userSnap = await get(child(ref(db), "users/"+userId));
   if(!userSnap.exists()) return;
   const user=userSnap.val();
   document.getElementById("deleteAgentName").value = user.name;
 
   const reportsContainer=document.getElementById("reportsContainer");
+
   async function loadReports(){
     reportsContainer.innerHTML="";
     const type=document.getElementById("filterType").value;
@@ -139,12 +150,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <i class="material-icons icon-btn" data-lat="${report.lat}" data-lng="${report.lng}">map</i>
           <i class="material-icons icon-btn" data-images='${JSON.stringify(report.images || [])}'>image</i>`;
       if(user.agentId && report.district===user.district){
-        html+=`<i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}">delete</i>`;
+        html+=`<i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}" data-userid="${report.userId}">delete</i>`;
       }
       html+=`</div></div>`;
       card.innerHTML=html;
       reportsContainer.appendChild(card);
     });
+
     document.querySelectorAll(".icon-btn").forEach(btn=>{
       if(btn.textContent==="map"){
         btn.onclick=()=>{
@@ -168,14 +180,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         }
       } else if(btn.classList.contains("delete")){
         btn.onclick=()=>{
-          const key=btn.dataset.key, type=btn.dataset.type;
+          const key=btn.dataset.key, type=btn.dataset.type, reportUserId=btn.dataset.userid;
           const deleteModal=M.Modal.getInstance(document.getElementById("deleteModal"));
           deleteModal.open();
           document.getElementById("confirmDelete").onclick=async ()=>{
             const reason=document.getElementById("deleteReason").value;
             const agreement=document.getElementById("deleteAgreement").checked;
             if(!reason || !agreement) return alert("Select reason and agree.");
-            await update(ref(db,"deletedreportinfo/"+report.userId+"/"+key),{deletedBy:user.name, agentId:user.agentId, reason, time:new Date().toLocaleString(), type});
+            await update(ref(db,"deletedreportinfo/"+reportUserId+"/"+key),{deletedBy:user.name, agentId:user.agentId, reason, time:new Date().toLocaleString(), type});
             await remove(ref(db,"reports/"+type+"/"+key));
             deleteModal.close();
             loadReports();
@@ -189,20 +201,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   document.getElementById("filterDistrict").onchange=loadReports;
   document.getElementById("btnHome").onclick=()=>{ window.location.href="home.html"; };
   document.getElementById("btnWhy").onclick=async ()=>{
-    reportsContainer.innerHTML="";
+    const deletedModal=M.Modal.getInstance(document.getElementById("whyModal"));
+    const deletedContainer=document.getElementById("deletedContainer");
+    deletedContainer.innerHTML="";
     const deletedSnap=await get(ref(db,"deletedreportinfo"));
-    if(!deletedSnap.exists()) return;
-    Object.entries(deletedSnap.val()).forEach(([uid, reports])=>{
-      Object.entries(reports).forEach(([rid, rinfo])=>{
-        const card=document.createElement("div"); card.className="card";
-        card.innerHTML=`<div class="card-content">
-          <p>Original Reporter ID: ${uid}</p>
-          <p>Deleted By: ${rinfo.deletedBy} | Agent ID: ${rinfo.agentId} | Reason: ${rinfo.reason}</p>
-          <p>Time: ${rinfo.time}</p>
-        </div>`;
-        reportsContainer.appendChild(card);
+    if(deletedSnap.exists()){
+      Object.entries(deletedSnap.val()).forEach(([uid, reports])=>{
+        Object.entries(reports).forEach(([rid, rinfo])=>{
+          const card=document.createElement("div"); card.className="card";
+          card.innerHTML=`<div class="card-content">
+            <p>Original Reporter ID: ${uid}</p>
+            <p>Deleted By: ${rinfo.deletedBy} | Agent ID: ${rinfo.agentId} | Reason: ${rinfo.reason}</p>
+            <p>Time: ${rinfo.time}</p>
+            <p>Agent Mobile: <a href="tel:${rinfo.agentMobile || ''}">${rinfo.agentMobile || 'N/A'}</a></p>
+          </div>`;
+          deletedContainer.appendChild(card);
+        });
       });
-    });
+    }
+    deletedModal.open();
   };
 
   loadReports();
