@@ -118,8 +118,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         if(now-reportTime>24*3600*1000) return;
         if(currentDistrict && report.district!==currentDistrict) return;
         let deleteBtnHTML="";
-        if(isAgent && userDistrict===report.district)
-          deleteBtnHTML=`<i class="fas fa-trash icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${report.userId}"></i>`;
+        if(isAgent) deleteBtnHTML=`<i class="fas fa-trash icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${report.userId}" data-district="${report.district}"></i>`;
         let html=`<div class="card">
           <div class="card-content">
             <span class="card-title">${report.description}</span>
@@ -171,6 +170,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       d.onclick=async()=>{
         const agentPass = prompt("Enter agent password:");
         if(agentPass!==user.password){alert("Incorrect password"); return;}
+        if(d.dataset.district!==userDistrict){alert("You cannot delete reports outside your district!"); return;}
         const reason = prompt("Reason for deletion? fake report, miscontent, fraud info, description fake, duplicate, other");
         if(!reason) return;
         const reportType = d.dataset.type, rKey=d.dataset.key, rUser=d.dataset.userid;
