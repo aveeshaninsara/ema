@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alerts - Elephant Monitoring</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
+  .card { margin: 12px auto; max-width: 480px; cursor: pointer; }
+  .card .card-action a { margin-right: 8px; }
+  #reportImages img { margin: 4px 0; max-width: 100%; border-radius: 8px; }
+  .modal { max-height: 80%; }
+  .container { padding-bottom: 100px; }
+</style>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, child, set, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getStorage, ref as storageRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  measurementId: "G-GSQEVX635R",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+window._fb = { db, ref, get, child, set, update, storage, storageRef, getDownloadURL };
+
+</script>
+</head>
+<body>
+
+<div class="container">
+  <h4>Alerts</h4>
+  <div class="input-field">
+    <select id="districtFilter">
+      <option value="" selected>All Districts</option>
+    </select>
+    <label>Filter by District</label>
+  </div>
+  <a href="#!" id="showDeleted" class="btn blue">Why is my report not showing?</a>
+  <div id="reportList"></div>
+</div>
+
+<!-- Report Modal -->
+<div id="reportModal" class="modal">
+  <div class="modal-content">
+    <h5>Report Details</h5>
+    <div id="reportDetails"></div>
+    <div id="reportImages"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" class="modal-close btn">Close</a>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="deleteModal" class="modal">
+  <div class="modal-content">
+    <h5>Delete Report</h5>
+    <div>
+      <label>Reason:</label>
+      <select id="deleteReason">
+        <option value="" disabled selected>Choose reason</option>
+        <option value="Fake Report">Fake Report</option>
+        <option value="Miscontent">Miscontent</option>
+        <option value="Fraud Information">Fraud Information</option>
+        <option value="Description is Fake">Description is Fake</option>
+        <option value="Duplicate Report">Duplicate Report</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="input-field">
+      <input type="text" id="deleteAgentName" disabled>
+      <label>Agent Name</label>
+    </div>
+    <div class="input-field">
+      <input type="text" id="deleteAgentID" placeholder="Enter your Agent ID">
+      <label>Agent ID</label>
+    </div>
+    <p>
+      <label>
+        <input type="checkbox" id="deleteAgreement"/>
+        <span>I agree that the information is correct and will not harass anyone.</span>
+      </label>
+    </p>
+    <a href="#!" id="confirmDelete" class="btn red">Delete</a>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  M.Modal.init(document.querySelectorAll('.modal'));
+  M.FormSelect.init(document.querySelectorAll('select'));
+
+  const { db, ref, get, child, storage, storageRef, getDownloadURL, update, set } = window._fb;
+  const reportList = document.getElementById("reportList");
+  const districtSelect = document.getElementById("districtFilter");
+  const deletedBtn = document.getElementById("showDeleted");
+  const userId = document.cookie.match('(^|;)\\s*emaId\\s*=\\s*([^;]+)')?.pop();
+  if (!userId) { window.location.href = "index.html"; return; }
+
+  const districts = ["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
+  districts.forEach(d=>districtSelect.innerHTML += `<option value="${d}">${d}</option>`);
+  M.FormSelect.init(document.querySelectorAll('select'));
+
+  // Fetch reports
+  const fetchReports = async () => {
+    reportList.innerHTML = '';
+    const snap = await get(ref(db,'reports'));
+    const now = Date.now();
+    if (!snap.exists()) return;
+
+    Object.entries(snap.val()).forEach(([rid, r])=>{
+      const reportTime = new Date(r.timestamp).getTime();
+      if(now - reportTime > 24*60*60*1000) return; // skip old
+      const card = document.createElement('div'); card.classList.add('card');
+      card.innerHTML = `
+        <div class="card-content">
+          <span class="card-title">${r.title}</span>
+          <p>${r.description.substring(0,50)}...</p>
+        </div>
+        <div class="card-action">
+          <a href="#!" class="view" data-id="${rid}">Details</a>
+          <a href="#!" class="map" data-lat="${r.latitude}" data-lng="${r.longitude}"><i class="material-icons">map</i></a>
+          <a href="#!" class="images" data-images='${JSON.stringify(r.images||[])}'><i class="material-icons">image</i></a>
+          <a href="#!" class="pdf" data-id="${rid}"><i class="material-icons">download</i></a>
+          ${r.agentId ? `<a href="#!" class="delete" data-id="${rid}">Delete</a>`:''}
+        </div>`;
+      reportList.appendChild(card);
+
+      card.querySelector('.view').onclick = ()=>viewReport(r);
+      card.querySelector('.map').onclick = ()=>alert(`Map placeholder for ${r.latitude},${r.longitude}`);
+      card.querySelector('.images').onclick = ()=>showImages(r.images||[]);
+      card.querySelector('.pdf').onclick = ()=>downloadPDF(r);
+      if(r.agentId) card.querySelector('.delete').onclick = ()=>openDeleteModal(r, rid);
+    });
+  }
+
+  const viewReport = r=>{
+    const modal = document.getElementById('reportModal');
+    document.getElementById('reportDetails').innerHTML = `<p><strong>Title:</strong> ${r.title}</p>
+      <p><strong>Description:</strong> ${r.description}</p>
+      <p><strong>Location:</strong> ${r.latitude},${r.longitude}</p>
+      <p><strong>Reporter:</strong> ${r.reporterName}</p>`;
+    document.getElementById('reportImages').innerHTML = '';
+    M.Modal.getInstance(modal).open();
+  }
+
+  const showImages = images=>{
+    const container = document.getElementById('reportImages');
+    container.innerHTML = '';
+    images.forEach(src=>{
+      const img = document.createElement('img'); img.src = src; img.classList.add('responsive-img');
+      container.appendChild(img);
+    });
+    M.Modal.getInstance(document.getElementById('reportModal')).open();
+  }
+
+  const downloadPDF = r=>{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.text(`Title: ${r.title}`,10,10);
+    doc.text(`Description: ${r.description}`,10,20);
+    doc.text(`Location: ${r.latitude}, ${r.longitude}`,10,30);
+    doc.save(`${r.title}.pdf`);
+  }
+
+  const openDeleteModal = (r, rid)=>{
+    M.Modal.getInstance(document.getElementById('deleteModal')).open();
+    document.getElementById('deleteAgentName').value = r.agentName || 'Agent';
+    M.updateTextFields();
+    document.getElementById('confirmDelete').onclick = async ()=>{
+      const reason = document.getElementById('deleteReason').value;
+      const agentId = document.getElementById('deleteAgentID').value;
+      const agreement = document.getElementById('deleteAgreement').checked;
+      if(!reason || !agentId || !agreement){ alert('Fill all fields'); return; }
+      const delRef = ref(db, `deletedreportinfo/${r.reporterId}/${rid}`);
+      await set(delRef,{reason, agentId, agentName: r.agentName||'Agent', timestamp: Date.now()});
+      await remove(ref(db, `reports/${rid}`));
+      M.Modal.getInstance(document.getElementById('deleteModal')).close();
+      fetchReports();
+    }
+  }
+
+  // Show deleted reports
+  deletedBtn.onclick = async ()=>{
+    const snap = await get(ref(db, 'deletedreportinfo'));
+    if(!snap.exists()){ alert('No deleted reports'); return; }
+    reportList.innerHTML = '';
+    Object.entries(snap.val()).forEach(([uid,reports])=>{
+      Object.entries(reports).forEach(([rid,rdata])=>{
+        const card = document.createElement('div'); card.classList.add('card');
+        card.innerHTML = `<div class="card-content">
+          <span class="card-title">Deleted Report</span>
+          <p>Deleted by: ${rdata.agentName} (${rdata.agentId})</p>
+          <p>Reason: ${rdata.reason}</p>
+          <p>Reporter ID: ${uid}</p>
+          <p>Timestamp: ${new Date(rdata.timestamp).toLocaleString()}</p>
+        </div>`;
+        reportList.appendChild(card);
+      });
+    });
+  }
+
+  districtSelect.onchange = fetchReports;
+
+  fetchReports();
+});
+</script>
+</body>
+</html>
