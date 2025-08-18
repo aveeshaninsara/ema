@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
 body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
-.container { max-width: 480px; margin: auto; padding: 10px; }
+.container { max-width: 480px; margin:auto; padding:10px; }
 .card { margin-bottom: 12px; }
 .card .card-content { padding: 12px; }
 .card .card-action { padding: 8px; }
@@ -99,7 +99,7 @@ img.report-image { max-width:100%; cursor:pointer; margin-bottom:4px; border-rad
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, child, update, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, child, set, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     snapReports.forEach(r=>{
       const report = r.val();
-      const key = r.key;
+      const key = r.key || r.key || r.id;
       const reportTime = new Date(report.time).getTime();
       if(now - reportTime > twentyFourH) return;
       if(district && report.district!==district) return;
@@ -296,7 +296,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const agreement=document.getElementById("deleteAgreement").checked;
     if(!agreement){M.toast({html:"You must agree before deleting"}); return;}
     const key=document.getElementById("btnConfirmDelete").dataset.reportKey;
-    const reportSnap = await get(child(ref(db,"reports/sightings/"+key)));
+    let reportSnap = await get(child(ref(db,"reports/sightings/"+key)));
     let reportType="sightings";
     let reportData=reportSnap.exists()?reportSnap.val():null;
     if(!reportData){
@@ -304,11 +304,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(accSnap.exists()){ reportData=accSnap.val(); reportType="accidents";}
     }
     if(!reportData){M.toast({html:"Report not found"}); return;}
-    // store deletion info
     await set(ref(db,"deletedreportinfo/"+reportData.userId+"/"+key),{
       reason, agentName, agentId, agentMobile:userData.mobile, description:reportData.description, timestamp:new Date().toString()
     });
-    // remove report
     await update(ref(db,"reports/"+reportType+"/"+key),{deleted:true});
     M.Modal.getInstance(document.getElementById("deleteModal")).close();
     loadReports();
