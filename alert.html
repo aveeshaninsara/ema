@@ -148,11 +148,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <p>District: ${report.district} | Elephants: ${report.numElephants} | Danger: ${report.dangerLevel}</p>
         <div class="card-actions">
           <i class="material-icons icon-btn" data-lat="${report.lat}" data-lng="${report.lng}">map</i>
-          <i class="material-icons icon-btn" data-images='${JSON.stringify(report.images || [])}'>image</i>`;
-      if(user.agentId && report.district===user.district){
-        html+=`<i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}" data-userid="${report.userId}">delete</i>`;
-      }
-      html+=`</div></div>`;
+          <i class="material-icons icon-btn" data-images='${JSON.stringify(report.images || [])}'>image</i>
+          <i class="material-icons icon-btn delete" data-key="${key}" data-type="${type}" data-userid="${report.userId}">delete</i>
+        </div></div>`;
       card.innerHTML=html;
       reportsContainer.appendChild(card);
     });
