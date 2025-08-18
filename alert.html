@@ -1,318 +1,308 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerts - Elephant Monitoring App</title>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<style>
-body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
-.container { max-width: 480px; margin:auto; padding:10px; }
-.card { margin-bottom: 12px; }
-.card .card-content { padding: 12px; }
-.card .card-action { padding: 8px; }
-.expandable-content { display:none; margin-top:8px; }
-.filter-row { display:flex; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; }
-#mapModal, #imageModal, #deleteModal { max-width: 480px; width: 95%; }
-#mapContainer { height:300px; }
-img.report-image { max-width:100%; cursor:pointer; margin-bottom:4px; border-radius:8px; }
-.delete-form label { display:block; margin-top:8px; }
-#deletedReportsSection { margin-top:12px; }
-.copy-number { color:#2e7d32; cursor:pointer; text-decoration:underline; }
-</style>
+  <meta charset="UTF-8">
+  <title>Alerts</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Materialize CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    body { background:#f5f5f5; }
+    .card { margin: 10px 0; }
+    .expandable-content { display:none; margin-top:10px; }
+    .report-image { width:100%; margin-bottom:10px; border-radius:8px; }
+    #mapContainer { height:300px; width:100%; }
+    .btn-small { margin:3px 2px; }
+    .floating-btn { position:fixed; bottom:20px; right:20px; z-index:1000; }
+  </style>
 </head>
 <body>
 
-<div class="container">
-  <h5 class="center">Alerts</h5>
-  <div class="center">
-    <a href="#!" id="btnDeletedReports" class="btn grey darken-1">Why is my report not showing?</a>
-  </div>
+  <nav class="blue">
+    <div class="nav-wrapper">
+      <a href="#!" class="brand-logo center">Alerts</a>
+    </div>
+  </nav>
 
-  <div class="filter-row">
-    <select id="districtFilter">
-      <option value="">All Districts</option>
-    </select>
-    <select id="typeFilter">
-      <option value="sightings">Sightings</option>
-      <option value="accidents">Accidents</option>
-    </select>
-  </div>
+  <div class="container">
+    <div class="section center">
+      <a id="btnWhyNotShowing" class="btn orange">Why is my report not showing?</a>
+    </div>
 
-  <div id="reportsContainer"></div>
-  <div id="deletedReportsSection"></div>
-</div>
-
-<!-- Map Modal -->
-<div id="mapModal" class="modal">
-  <div class="modal-content">
-    <h5>Location</h5>
-    <div id="mapContainer"></div>
-  </div>
-  <div class="modal-footer">
-    <a href="#!" class="modal-close btn red">Close</a>
-  </div>
-</div>
-
-<!-- Image Modal -->
-<div id="imageModal" class="modal">
-  <div class="modal-content" id="imageModalContent"></div>
-  <div class="modal-footer">
-    <a href="#!" class="modal-close btn red">Close</a>
-  </div>
-</div>
-
-<!-- Delete Modal -->
-<div id="deleteModal" class="modal">
-  <div class="modal-content">
-    <h5>Delete Report</h5>
-    <div class="delete-form">
-      <label for="deleteReason">Reason for deletion</label>
-      <select id="deleteReason">
-        <option value="Fake report">Fake report</option>
-        <option value="Miscontent">Miscontent</option>
-        <option value="Fraud information">Fraud information</option>
-        <option value="Description is fake">Description is fake</option>
-        <option value="Duplicate report">Duplicate report</option>
-        <option value="Other">Other</option>
+    <div class="input-field">
+      <select id="districtFilter">
+        <option value="">All Districts</option>
+        <option>Ampara</option><option>Anuradhapura</option><option>Badulla</option><option>Batticaloa</option>
+        <option>Colombo</option><option>Galle</option><option>Gampaha</option><option>Hambantota</option>
+        <option>Jaffna</option><option>Kalutara</option><option>Kandy</option><option>Kegalle</option>
+        <option>Kilinochchi</option><option>Kurunegala</option><option>Mannar</option><option>Matale</option>
+        <option>Matara</option><option>Monaragala</option><option>Mullaitivu</option><option>Nuwara Eliya</option>
+        <option>Polonnaruwa</option><option>Puttalam</option><option>Ratnapura</option><option>Trincomalee</option>
+        <option>Vavuniya</option>
       </select>
-      <label>Agent Name</label>
-      <input type="text" id="deleteAgentName" readonly>
-      <label for="deleteAgentId">Agent ID</label>
-      <input type="text" id="deleteAgentId">
+      <label>Filter by District</label>
+    </div>
+
+    <h5 class="blue-text">Sightings</h5>
+    <div id="sightingsContainer"></div>
+
+    <h5 class="red-text">Accidents</h5>
+    <div id="accidentsContainer"></div>
+  </div>
+
+  <!-- Map Modal -->
+  <div id="mapModal" class="modal">
+    <div class="modal-content"><h5>Location</h5><div id="mapContainer"></div></div>
+    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
+  </div>
+
+  <!-- Images Modal -->
+  <div id="imageModal" class="modal">
+    <div class="modal-content"><h5>Images</h5><div id="imageModalContent"></div></div>
+    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
+  </div>
+
+  <!-- Delete Modal -->
+  <div id="deleteModal" class="modal">
+    <div class="modal-content">
+      <h5>Delete Report</h5>
+      <div class="input-field">
+        <select id="deleteReason">
+          <option value="Fake Report">Fake Report</option>
+          <option value="Miscontent">Miscontent</option>
+          <option value="Fraud Information">Fraud Information</option>
+          <option value="Description is Fake">Description is Fake</option>
+          <option value="Duplicate Report">Duplicate Report</option>
+          <option value="Other">Other</option>
+        </select>
+        <label>Reason</label>
+      </div>
+      <div class="input-field">
+        <input id="deleteAgentName" type="text" readonly>
+        <label for="deleteAgentName">Agent Name</label>
+      </div>
+      <div class="input-field">
+        <input id="deleteAgentId" type="text" readonly>
+        <label for="deleteAgentId">Agent ID</label>
+      </div>
       <label>
         <input type="checkbox" id="deleteAgreement">
         <span>I agree this information is correct and I will not harass anyone</span>
       </label>
     </div>
+    <div class="modal-footer">
+      <a href="#!" id="btnConfirmDelete" class="btn red">Delete</a>
+      <a href="#!" class="modal-close btn-flat">Cancel</a>
+    </div>
   </div>
-  <div class="modal-footer">
-    <a href="#!" id="btnConfirmDelete" class="btn red">Delete</a>
-    <a href="#!" class="modal-close btn grey">Cancel</a>
+
+  <!-- Deleted Reports Modal -->
+  <div id="deletedModal" class="modal">
+    <div class="modal-content">
+      <h5>Deleted Reports</h5>
+      <div id="deletedReportsContainer"></div>
+    </div>
+    <div class="modal-footer"><a href="#!" class="modal-close btn">Close</a></div>
   </div>
-</div>
 
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, child, set, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  <!-- Firebase & Libs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
-  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-  projectId: "elephant-monitoring-app-99ffd",
-  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
-  messagingSenderId: "649960879930",
-  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-  measurementId: "G-GSQEVX635R",
-  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
-};
+  <script>
+    // TODO: replace with your firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_KEY",
+      authDomain: "YOUR_APP.firebaseapp.com",
+      databaseURL: "https://YOUR_APP.firebaseio.com",
+      projectId: "YOUR_APP",
+      storageBucket: "YOUR_APP.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+    // Fake current user (replace with cookie/localStorage)
+    const userData = JSON.parse(localStorage.getItem("userData")) || {
+      name:"Aveesha Ninsara", mobile:"0771850503", agentId:"EA-42DNDC"
+    };
 
-function getCookie(name){
-  const match = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
-  return match? match[2] : null;
-}
-const userId=getCookie("emaId");
-if(!userId){window.location.href="index.html";}
+    document.addEventListener("DOMContentLoaded", function(){
+      M.AutoInit();
+      loadReports();
 
-document.addEventListener("DOMContentLoaded", async ()=>{
-  M.Modal.init(document.querySelectorAll('.modal'));
-  M.FormSelect.init(document.querySelectorAll('select'));
+      document.getElementById("districtFilter").addEventListener("change", loadReports);
+      document.getElementById("btnWhyNotShowing").addEventListener("click", loadDeletedReports);
+    });
 
-  const districts=[
-    "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"
-  ];
+    function within24h(timeStr){
+      const t = new Date(timeStr);
+      return (Date.now()-t.getTime()) < (24*60*60*1000);
+    }
 
-  const districtFilter=document.getElementById("districtFilter");
-  districts.forEach(d=>{
-    const opt=document.createElement("option");
-    opt.value=d; opt.textContent=d;
-    districtFilter.appendChild(opt);
-  });
-  M.FormSelect.init(document.querySelectorAll('select'));
+    async function loadReports(){
+      document.getElementById("sightingsContainer").innerHTML="";
+      document.getElementById("accidentsContainer").innerHTML="";
+      const districtFilter = document.getElementById("districtFilter").value;
 
-  let userData={};
-  const snap=await get(child(ref(db),"users/"+userId));
-  if(snap.exists()) userData = snap.val();
+      const types=["sightings","accidents"];
+      for(const type of types){
+        const snap = await db.ref("reports/"+type).get();
+        if(!snap.exists()) continue;
+        snap.forEach(r=>{
+          const rep = r.val();
+          if(!within24h(rep.time)) return;
+          if(districtFilter && rep.district!==districtFilter) return;
+          renderReportCard(type,r.key,rep);
+        });
+      }
+    }
 
-  const reportsContainer=document.getElementById("reportsContainer");
-
-  async function loadReports(){
-    reportsContainer.innerHTML="";
-    const type = document.getElementById("typeFilter").value;
-    const district = document.getElementById("districtFilter").value;
-    const now = new Date().getTime();
-    const twentyFourH = 24*60*60*1000;
-
-    const snapReports = await get(child(ref(db),"reports/"+type));
-    if(!snapReports.exists()) return;
-
-    snapReports.forEach(r=>{
-      const report = r.val();
-      const key = r.key || r.key || r.id;
-      const reportTime = new Date(report.time).getTime();
-      if(now - reportTime > twentyFourH) return;
-      if(district && report.district!==district) return;
-
+    function renderReportCard(type,key,report){
+      const container = type==="sightings" ? document.getElementById("sightingsContainer") : document.getElementById("accidentsContainer");
       const card = document.createElement("div");
       card.className="card";
       const cardContent = document.createElement("div");
       cardContent.className="card-content";
-      cardContent.innerHTML=`<span class="card-title activator grey-text text-darken-4">${report.description}<i class="material-icons right">expand_more</i></span>
+      cardContent.innerHTML=`
+        <span class="card-title activator">${report.description}<i class="material-icons right">expand_more</i></span>
         <p><strong>District:</strong> ${report.district}</p>
         <p><strong>Reporter:</strong> ${report.userName}</p>
       `;
+      const exp = document.createElement("div");
+      exp.className="expandable-content";
 
-      const expandable = document.createElement("div");
-      expandable.className="expandable-content";
-
-      if(report.numElephants) expandable.innerHTML+=`<p><strong>Number of Elephants:</strong> ${report.numElephants}</p>`;
-      if(report.dangerLevel) expandable.innerHTML+=`<p><strong>Danger Level:</strong> ${report.dangerLevel}</p>`;
-
-      // Images
-      if(report.images){
-        if(report.images.length){
-          report.images.forEach(img=>{
-            const im = document.createElement("img");
-            im.src=img;
-            im.className="report-image";
-            im.addEventListener("click", ()=>{
-              const modal = M.Modal.getInstance(document.getElementById("imageModal"));
-              document.getElementById("imageModalContent").innerHTML=`<img src="${img}" style="width:100%">`;
-              modal.open();
-            });
-            expandable.appendChild(im);
-          });
-        }
-      }
-
-      // Map
+      // Map button
       if(report.lat && report.lng){
-        const mapBtn = document.createElement("a");
-        mapBtn.href="#!"; mapBtn.className="btn blue btn-small"; mapBtn.innerHTML='<i class="material-icons">map</i>';
-        mapBtn.addEventListener("click", ()=>{
-          const mapModal = M.Modal.getInstance(document.getElementById("mapModal"));
-          mapModal.open();
+        const mapBtn=document.createElement("a");
+        mapBtn.className="btn blue btn-small";
+        mapBtn.innerHTML='<i class="material-icons">map</i>';
+        mapBtn.onclick=()=>{
+          const modal=M.Modal.getInstance(document.getElementById("mapModal"));
+          modal.open();
           setTimeout(()=>{
-            const map = L.map('mapContainer').setView([report.lat, report.lng], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-              attribution:'&copy; OpenStreetMap contributors'
-            }).addTo(map);
-            L.marker([report.lat, report.lng]).addTo(map).bindPopup(report.description).openPopup();
+            document.getElementById("mapContainer").innerHTML="";
+            const map=L.map("mapContainer").setView([report.lat,report.lng],13);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}).addTo(map);
+            L.marker([report.lat,report.lng]).addTo(map).bindPopup(report.description).openPopup();
           },200);
-        });
-        expandable.appendChild(mapBtn);
+        };
+        exp.appendChild(mapBtn);
       }
 
-      // PDF download
-      const pdfBtn = document.createElement("a");
-      pdfBtn.href="#!";
+      // Images button
+      if(report.images){
+        const imgBtn=document.createElement("a");
+        imgBtn.className="btn orange btn-small";
+        imgBtn.innerHTML='<i class="material-icons">image</i>';
+        imgBtn.onclick=()=>{
+          const modal=M.Modal.getInstance(document.getElementById("imageModal"));
+          const cont=document.getElementById("imageModalContent");
+          cont.innerHTML="";
+          report.images.forEach(url=>{
+            const im=document.createElement("img"); im.src=url; im.className="report-image";
+            cont.appendChild(im);
+          });
+          modal.open();
+        };
+        exp.appendChild(imgBtn);
+      }
+
+      // PDF button
+      const pdfBtn=document.createElement("a");
       pdfBtn.className="btn green btn-small";
-      pdfBtn.textContent="Download PDF";
-      pdfBtn.addEventListener("click", ()=>{
+      pdfBtn.textContent="PDF";
+      pdfBtn.onclick=()=>{
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        let y = 10;
-        doc.text(`Report: ${report.description}`,10,y); y+=10;
-        doc.text(`District: ${report.district}`,10,y); y+=10;
-        doc.text(`Reporter: ${report.userName}`,10,y); y+=10;
-        if(report.numElephants) { doc.text(`Number of Elephants: ${report.numElephants}`,10,y); y+=10; }
-        if(report.dangerLevel) { doc.text(`Danger Level: ${report.dangerLevel}`,10,y); y+=10; }
-        doc.save(`report-${key}.pdf`);
-      });
-      expandable.appendChild(pdfBtn);
+        doc.text("Report",10,10);
+        doc.text("Description: "+report.description,10,20);
+        doc.text("District: "+report.district,10,30);
+        doc.text("Reporter: "+report.userName,10,40);
+        doc.save("report-"+key+".pdf");
+      };
+      exp.appendChild(pdfBtn);
 
-      // Agent delete
+      // Delete button (if agent)
       if(userData.agentId){
-        const deleteBtn = document.createElement("a");
-        deleteBtn.href="#deleteModal"; deleteBtn.className="btn red btn-small modal-trigger";
-        deleteBtn.textContent="Delete Report";
-        deleteBtn.addEventListener("click",()=>{
+        const delBtn=document.createElement("a");
+        delBtn.className="btn red btn-small modal-trigger";
+        delBtn.href="#deleteModal";
+        delBtn.textContent="Delete";
+        delBtn.onclick=()=>{
           document.getElementById("deleteAgentName").value=userData.name;
           document.getElementById("deleteAgentId").value=userData.agentId;
           document.getElementById("btnConfirmDelete").dataset.reportKey=key;
-        });
-        expandable.appendChild(deleteBtn);
+          document.getElementById("btnConfirmDelete").dataset.reportType=type;
+        };
+        exp.appendChild(delBtn);
       }
 
       card.appendChild(cardContent);
-      card.appendChild(expandable);
-      reportsContainer.appendChild(card);
+      card.appendChild(exp);
+      container.appendChild(card);
 
-      // Toggle expandable
-      cardContent.querySelector(".activator").addEventListener("click", ()=>{
-        expandable.style.display = expandable.style.display==="none"?"block":"none";
-      });
-    });
-  }
-
-  document.getElementById("districtFilter").addEventListener("change", loadReports);
-  document.getElementById("typeFilter").addEventListener("change", loadReports);
-  loadReports();
-
-  // Deleted reports
-  document.getElementById("btnDeletedReports").addEventListener("click", async ()=>{
-    const deletedSec=document.getElementById("deletedReportsSection");
-    deletedSec.innerHTML="<h6>Deleted Reports</h6>";
-    const snapDeleted = await get(ref(db,"deletedreportinfo"));
-    if(!snapDeleted.exists()){ deletedSec.innerHTML+="<p>No deleted reports</p>"; return; }
-
-    snapDeleted.forEach(userSnap=>{
-      const userReports = userSnap.val();
-      Object.keys(userReports).forEach(rKey=>{
-        const r = userReports[rKey];
-        const div = document.createElement("div");
-        div.className="card grey lighten-3";
-        div.innerHTML=`<div class="card-content">
-          <p><strong>Report Description:</strong> ${r.description}</p>
-          <p><strong>Deleted by:</strong> ${r.agentName} (${r.agentId})</p>
-          <p><strong>Reason:</strong> ${r.reason}</p>
-          <p><strong>Agent Mobile:</strong> <span class="copy-number">${r.agentMobile}</span></p>
-        </div>`;
-        deletedSec.appendChild(div);
-      });
-    });
-
-    document.querySelectorAll(".copy-number").forEach(el=>{
-      el.addEventListener("click",()=>{
-        navigator.clipboard.writeText(el.textContent.trim());
-        M.toast({html:"Copied to clipboard"});
-      });
-    });
-  });
-
-  // Delete confirm
-  document.getElementById("btnConfirmDelete").addEventListener("click", async ()=>{
-    const reason=document.getElementById("deleteReason").value;
-    const agentName=document.getElementById("deleteAgentName").value;
-    const agentId=document.getElementById("deleteAgentId").value;
-    const agreement=document.getElementById("deleteAgreement").checked;
-    if(!agreement){M.toast({html:"You must agree before deleting"}); return;}
-    const key=document.getElementById("btnConfirmDelete").dataset.reportKey;
-    let reportSnap = await get(child(ref(db,"reports/sightings/"+key)));
-    let reportType="sightings";
-    let reportData=reportSnap.exists()?reportSnap.val():null;
-    if(!reportData){
-      const accSnap=await get(child(ref(db,"reports/accidents/"+key)));
-      if(accSnap.exists()){ reportData=accSnap.val(); reportType="accidents";}
+      cardContent.querySelector(".activator").onclick=()=>{
+        exp.style.display=exp.style.display==="block"?"none":"block";
+      };
     }
-    if(!reportData){M.toast({html:"Report not found"}); return;}
-    await set(ref(db,"deletedreportinfo/"+reportData.userId+"/"+key),{
-      reason, agentName, agentId, agentMobile:userData.mobile, description:reportData.description, timestamp:new Date().toString()
-    });
-    await update(ref(db,"reports/"+reportType+"/"+key),{deleted:true});
-    M.Modal.getInstance(document.getElementById("deleteModal")).close();
-    loadReports();
-  });
 
-});
-</script>
+    document.getElementById("btnConfirmDelete").onclick=async ()=>{
+      const reason=document.getElementById("deleteReason").value;
+      const agentName=document.getElementById("deleteAgentName").value;
+      const agentId=document.getElementById("deleteAgentId").value;
+      const agree=document.getElementById("deleteAgreement").checked;
+      if(!agree){M.toast({html:"Agree before deleting"});return;}
+      const key=this.dataset.reportKey;
+      const type=this.dataset.reportType;
+      const snap=await db.ref("reports/"+type+"/"+key).get();
+      if(!snap.exists()){M.toast({html:"Report missing"});return;}
+      const rep=snap.val();
+      await db.ref("deletedreportinfo/"+rep.userId+"/"+key).set({
+        ...rep, reason, agentName, agentId, agentMobile:userData.mobile, deletedAt:new Date().toString()
+      });
+      await db.ref("reports/"+type+"/"+key).remove();
+      M.Modal.getInstance(document.getElementById("deleteModal")).close();
+      loadReports();
+      M.toast({html:"Deleted"});
+    };
+
+    async function loadDeletedReports(){
+      const cont=document.getElementById("deletedReportsContainer");
+      cont.innerHTML="";
+      const snap=await db.ref("deletedreportinfo").get();
+      if(!snap.exists()){cont.innerHTML="<p>No deleted reports.</p>";}
+      snap.forEach(user=>{
+        user.forEach(rep=>{
+          const r=rep.val();
+          const div=document.createElement("div");
+          div.className="card";
+          div.innerHTML=`
+            <div class="card-content">
+              <span class="card-title">${r.description}</span>
+              <p><strong>Reason:</strong> ${r.reason}</p>
+              <p><strong>Deleted by:</strong> ${r.agentName} (${r.agentId})</p>
+              <p><strong>Contact:</strong> <a href="tel:${r.agentMobile}" class="blue-text copyable">${r.agentMobile}</a></p>
+            </div>`;
+          cont.appendChild(div);
+        });
+      });
+      M.Modal.getInstance(document.getElementById("deletedModal")).open();
+
+      document.querySelectorAll(".copyable").forEach(el=>{
+        el.onclick=(e)=>{e.preventDefault();navigator.clipboard.writeText(el.textContent);M.toast({html:"Copied!"});};
+      });
+    }
+  </script>
 </body>
 </html>
