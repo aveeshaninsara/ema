@@ -26,15 +26,73 @@ window._fb = { db, ref, get, set, update, child, remove };
 </script>
 
 <style>
-body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
-.card-thin { padding:10px; border-radius:12px; margin:12px auto; max-width:480px; cursor:pointer; }
-.profile-pic { width:60px; height:60px; border-radius:50%; object-fit:cover; }
-.stat-card { display:flex; justify-content:space-between; padding:10px 16px; border-radius:12px; margin:12px auto; max-width:480px; }
-.stat-item { text-align:center; flex:1; }
-.stat-item h6 { margin:0; font-weight:bold; }
-.action-btns { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:480px; margin:20px auto; }
-.fixed-btn { position:fixed; bottom:20px; right:20px; }
-.ai-btn { position:fixed; bottom:20px; left:20px; background:#2e7d32; border-radius:50%; width:56px; height:56px; display:flex; align-items:center; justify-content:center; color:white; }
+body {
+  font-family: Roboto, sans-serif;
+  margin:0;
+  background:#fafafa;
+}
+.card-thin {
+  padding:10px;
+  border-radius:12px;
+  margin:12px auto;
+  max-width:480px;
+  cursor:pointer;
+}
+.profile-pic {
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  object-fit:cover;
+}
+.stat-card {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  padding:10px 16px;
+  border-radius:12px;
+  margin:12px auto;
+  max-width:480px;
+}
+.stat-item {
+  text-align:center;
+  flex:1 1 45%;
+  margin-bottom:10px;
+}
+.stat-item h6 {
+  margin:0;
+  font-weight:bold;
+}
+.action-btns {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+  gap:12px;
+  max-width:480px;
+  margin:20px auto;
+}
+.fixed-btn {
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  z-index:1000;
+}
+.ai-btn {
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  background:#2e7d32;
+  border-radius:50%;
+  width:56px;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  z-index:1000;
+}
+@media (max-width: 400px){
+  .profile-pic { width:50px; height:50px; }
+  .action-btns { gap:8px; }
+}
 </style>
 </head>
 <body>
@@ -150,7 +208,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   const userId=getCookie("emaId");
   if(!userId){window.location.href="index.html";return;}
 
-  // Load user info
   get(child(ref(db),"users/"+userId)).then(snap=>{
     if(snap.exists()){
       const u=snap.val();
@@ -176,7 +233,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Save profile
   document.getElementById("btnSaveProfile").addEventListener("click",async()=>{
     const file=document.getElementById("editPic").files[0];
     let updates={
@@ -190,7 +246,7 @@ document.addEventListener("DOMContentLoaded",()=>{
       reader.onload=async()=>{
         updates.picBase64=reader.result;
         await update(ref(db,"users/"+userId),updates);
-        window.close(); // close tab after save
+        window.close();
       };
       reader.readAsDataURL(file);
     }else{
@@ -199,7 +255,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Logout
   document.getElementById("btnLogout").addEventListener("click",()=>{
     document.cookie = "emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
     localStorage.clear();
@@ -207,7 +262,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     setTimeout(()=>{window.location.href="index.html";},200);
   });
 
-  // Agent registration
   document.getElementById("btnRegisterAgent").addEventListener("click",async()=>{
     const agentId="EA-"+Math.floor(1000+Math.random()*9000);
     const info={
@@ -220,7 +274,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     location.reload();
   });
 
-  // Load stats
   get(ref(db,"stats")).then(snap=>{
     if(snap.exists()){
       const s=snap.val();
@@ -231,7 +284,6 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // Open profile modal
   document.getElementById("profileCard").addEventListener("click",()=>{
     M.Modal.getInstance(document.getElementById("editProfileModal")).open();
   });
