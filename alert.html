@@ -4,38 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alerts - Elephant Monitoring App</title>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
-.card { margin:12px auto; max-width:480px; border-radius:12px; overflow:hidden; }
+body { font-family: Roboto, sans-serif; background:#f5f5f5; margin:0; padding:0; }
+.container { max-width:500px; margin:auto; padding:10px; }
+.card { margin:10px 0; border-radius:12px; }
 .card-content { padding:12px; }
 .card-title { font-weight:bold; }
-.card-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
-.icon-btn { cursor:pointer; color:#1565c0; }
+.card-actions { display:flex; justify-content:flex-end; gap:10px; }
+.icon-btn { cursor:pointer; font-size:1.2em; }
 .icon-btn.delete { color:red; }
+.fixed-buttons { display:flex; justify-content:space-between; margin:10px 0; }
+select { display:inline-block; width:48%; }
 .modal { max-height:90%; }
 #mapPopup { height:300px; width:100%; }
-.image-container img { width:80px; height:80px; margin:4px; cursor:pointer; object-fit:cover; }
-.fixed-buttons { display:flex; justify-content:space-between; max-width:480px; margin:12px auto; }
+.image-container img { width:80px; height:80px; margin:4px; cursor:pointer; object-fit:cover; border-radius:6px; }
 </style>
 </head>
 <body>
-
-<div class="fixed-buttons">
-  <a id="btnHome" class="btn green">Home</a>
-  <a id="btnWhy" class="btn blue">Why is my report not showing?</a>
+<div class="container">
+  <div class="fixed-buttons">
+    <a id="btnHome" class="btn green">Home</a>
+    <a id="btnWhy" class="btn blue">Why is my report not showing?</a>
+  </div>
+  <div class="fixed-buttons">
+    <select id="typeFilter">
+      <option value="sightings">Sightings</option>
+      <option value="accidents">Accidents</option>
+    </select>
+    <select id="districtFilter">
+      <option value="">All Districts</option>
+    </select>
+  </div>
+  <div id="reportContainer"></div>
 </div>
-
-<div id="filterButtons" class="fixed-buttons">
-  <a class="btn grey filter-btn" data-type="sightings">Sightings</a>
-  <a class="btn grey filter-btn" data-type="accidents">Accidents</a>
-  <select id="districtFilter">
-    <option value="">All Districts</option>
-  </select>
-</div>
-
-<div id="reportContainer"></div>
 
 <div id="deletedReportsModal" class="modal">
   <div class="modal-content">
@@ -69,7 +73,7 @@ body { font-family: Roboto, sans-serif; margin:0; background:#fafafa; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, child, update, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -81,32 +85,29 @@ const firebaseConfig = {
   appId: "1:649960879930:web:d6f703cea9029a2fd14203",
   measurementId: "G-GSQEVX635R"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-document.addEventListener("DOMContentLoaded", async()=>{
-
+document.addEventListener("DOMContentLoaded", async ()=>{
   const districts = ["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
   const districtFilter = document.getElementById("districtFilter");
   districts.forEach(d=>{ let o=document.createElement("option"); o.value=d;o.textContent=d; districtFilter.appendChild(o); });
-
+  M.FormSelect.init(document.querySelectorAll('select'));
   M.Modal.init(document.querySelectorAll('.modal'));
-  const userId = document.cookie.match("(^|;)\\s*emaId\\s*=\\s*([^;]+)")?.pop();
-  if(!userId) { window.location.href="index.html"; return; }
 
-  const userSnap = await get(child(ref(db),"users/"+userId));
-  if(!userSnap.exists()) return;
-  const user = userSnap.val();
+  const userId = "EMA-42DNDC"; 
+  const userSnap = await get(ref(db,"users/"+userId));
+  const user = userSnap.exists()? userSnap.val() : {role:"user",name:"Unknown",password:"",district:""};
   const isAgent = user.role && user.role.toLowerCase()==="agent";
   const userDistrict = user.district;
 
-  let currentType = "sightings";
+  let currentType = document.getElementById("typeFilter").value;
   let currentDistrict = "";
 
-  const reportContainer = document.getElementById("reportContainer");
-
   async function loadReports(){
-    reportContainer.innerHTML="";
+    const container = document.getElementById("reportContainer");
+    container.innerHTML="";
     const snapshot = await get(ref(db,"reports/"+currentType));
     if(snapshot.exists()){
       const now = new Date().getTime();
@@ -117,26 +118,27 @@ document.addEventListener("DOMContentLoaded", async()=>{
         if(now-reportTime>24*3600*1000) return;
         if(currentDistrict && report.district!==currentDistrict) return;
         let deleteBtnHTML="";
-        if(isAgent && userDistrict===report.district) deleteBtnHTML=`<i class="material-icons icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${report.userId}">delete</i>`;
+        if(isAgent && userDistrict===report.district)
+          deleteBtnHTML=`<i class="fas fa-trash icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${report.userId}"></i>`;
         let html=`<div class="card">
           <div class="card-content">
             <span class="card-title">${report.description}</span>
             <p><b>Reporter:</b> ${report.userName} | <b>Mobile:</b> <span class="reporterMobile" data-num="${report.userMobile}">${report.userMobile}</span></p>
-            <p><b>District:</b> ${report.district} | <b>Elephants:</b> ${report.numElephants} | <b>Danger:</b> ${report.dangerLevel}</b></p>
+            <p><b>District:</b> ${report.district} | <b>Elephants:</b> ${report.numElephants} | <b>Danger:</b> ${report.dangerLevel}</p>
             <div class="card-actions">
-              <i class="material-icons icon-btn map" data-lat="${report.lat}" data-lng="${report.lng}">map</i>
-              <i class="material-icons icon-btn images" data-images='${JSON.stringify(report.images||[])}'>image</i>
+              <i class="fas fa-map icon-btn map" data-lat="${report.lat}" data-lng="${report.lng}"></i>
+              <i class="fas fa-image icon-btn images" data-images='${JSON.stringify(report.images||[])}'></i>
               ${deleteBtnHTML}
             </div>
           </div>
         </div>`;
-        reportContainer.innerHTML+=html;
+        container.innerHTML+=html;
       });
-      attachCardEvents();
+      attachEvents();
     }
   }
 
-  function attachCardEvents(){
+  function attachEvents(){
     document.querySelectorAll(".map").forEach(m=>{
       m.onclick=()=>{
         const lat=parseFloat(m.dataset.lat), lng=parseFloat(m.dataset.lng);
@@ -167,16 +169,15 @@ document.addEventListener("DOMContentLoaded", async()=>{
     });
     document.querySelectorAll(".delete").forEach(d=>{
       d.onclick=async()=>{
-        const agentPass=prompt("Enter agent password:");
-        if(!agentPass) return;
-        if(agentPass!==user.password) { alert("Incorrect password"); return; }
-        const reason = prompt("Reason for deletion? fake report, miscontent, fraud information, description is fake, duplicate report, other");
+        const agentPass = prompt("Enter agent password:");
+        if(agentPass!==user.password){alert("Incorrect password"); return;}
+        const reason = prompt("Reason for deletion? fake report, miscontent, fraud info, description fake, duplicate, other");
         if(!reason) return;
         const reportType = d.dataset.type, rKey=d.dataset.key, rUser=d.dataset.userid;
         await set(ref(db,`deletedreportinfo/${rUser}/${rKey}`),{
           deletedBy:user.name,
-          agentId:user.agentId,
-          agentMobile:user.mobile,
+          agentId:userId,
+          agentMobile:user.mobile||"",
           reason,
           time:new Date().toLocaleString(),
           type:reportType
@@ -188,18 +189,11 @@ document.addEventListener("DOMContentLoaded", async()=>{
   }
 
   loadReports();
-
-  document.querySelectorAll(".filter-btn").forEach(b=>{
-    b.onclick=()=>{
-      currentType=b.dataset.type;
-      loadReports();
-    };
-  });
-  districtFilter.onchange=()=>{currentDistrict=districtFilter.value; loadReports();};
-
+  document.getElementById("typeFilter").onchange=e=>{currentType=e.target.value; loadReports();}
+  districtFilter.onchange=e=>{currentDistrict=e.target.value; loadReports();}
   document.getElementById("btnWhy").onclick=async()=>{
-    const deletedSnap=await get(ref(db,"deletedreportinfo"));
-    const container=document.getElementById("deletedContainer");
+    const deletedSnap = await get(ref(db,"deletedreportinfo"));
+    const container = document.getElementById("deletedContainer");
     container.innerHTML="";
     if(deletedSnap.exists()){
       deletedSnap.forEach(userSnap=>{
@@ -214,13 +208,11 @@ document.addEventListener("DOMContentLoaded", async()=>{
           </div>`;
         });
       });
-      attachCardEvents();
+      attachEvents();
     }
     M.Modal.getInstance(document.getElementById("deletedReportsModal")).open();
   };
-
   document.getElementById("btnHome").onclick=()=>{window.location.href="home.html";};
-
 });
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
