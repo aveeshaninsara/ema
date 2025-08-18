@@ -28,72 +28,82 @@ window._fb = { db, ref, get, update, child };
 <style>
 body {
   font-family: Roboto, sans-serif;
-  margin:0;
-  background:#fafafa;
+  margin: 0;
+  background: #fafafa;
 }
 .container {
-  padding: 12px;
+  padding: 8px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 .card-thin {
-  padding:10px;
-  border-radius:12px;
-  margin-bottom:12px;
-  cursor:pointer;
+  padding: 8px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
   width: 100%;
   box-sizing: border-box;
 }
 .profile-pic {
-  width:60px;
-  height:60px;
-  border-radius:50%;
-  object-fit:cover;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 .stat-card {
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-between;
-  padding:10px 16px;
-  border-radius:12px;
-  margin-bottom:12px;
-  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
 }
 .stat-item {
-  text-align:center;
-  flex:1 1 45%;
-  margin-bottom:10px;
+  text-align: center;
+  flex: 1 1 45%;
+  margin-bottom: 6px;
 }
 .stat-item h6 {
-  margin:0;
-  font-weight:bold;
+  margin: 0;
+  font-weight: bold;
 }
 .action-btns {
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
-  gap:12px;
-  margin-bottom:20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
 }
 .fixed-btn {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  z-index:1000;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+  transform: scale(0.9);
 }
 .ai-btn {
-  position:fixed;
-  bottom:20px;
-  left:20px;
-  background:#2e7d32;
-  border-radius:50%;
-  width:56px;
-  height:56px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:white;
-  z-index:1000;
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  background: #2e7d32;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 1000;
+  transform: scale(0.9);
 }
 .modal {
-  max-height: 90%;
+  max-height: 85%;
+}
+input, select {
+  font-size: 0.9rem;
+}
+.btn, .btn-large, .btn-floating {
+  font-size: 0.85rem;
+  padding: 0 10px;
 }
 </style>
 </head>
@@ -101,42 +111,42 @@ body {
 
 <div class="container">
 
-<div class="card white card-thin" id="profileCard">
-  <div class="valign-wrapper">
-    <img id="profilePic" src="" class="profile-pic">
-    <div style="margin-left:12px;">
-      <h6 id="profileName">Loading...</h6>
-      <p id="profileEmail" class="grey-text"></p>
-      <p id="agentStatus" class="green-text"></p>
+  <div class="card white card-thin" id="profileCard">
+    <div class="valign-wrapper">
+      <img id="profilePic" src="" class="profile-pic">
+      <div style="margin-left:10px;">
+        <h6 id="profileName">Loading...</h6>
+        <p id="profileEmail" class="grey-text" style="font-size:0.85rem"></p>
+        <p id="agentStatus" class="green-text" style="font-size:0.85rem"></p>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="card white stat-card">
-  <div class="stat-item">
-    <h6 id="statElephants">0</h6>
-    <span>Elephants</span>
+  <div class="card white stat-card">
+    <div class="stat-item">
+      <h6 id="statElephants">0</h6>
+      <span>Elephants</span>
+    </div>
+    <div class="stat-item">
+      <h6 id="statReports">0</h6>
+      <span>Reports</span>
+    </div>
+    <div class="stat-item">
+      <h6 id="statDanger">0</h6>
+      <span>High Danger</span>
+    </div>
+    <div class="stat-item">
+      <h6 id="statDeaths">0</h6>
+      <span>Deaths</span>
+    </div>
   </div>
-  <div class="stat-item">
-    <h6 id="statReports">0</h6>
-    <span>Reports</span>
-  </div>
-  <div class="stat-item">
-    <h6 id="statDanger">0</h6>
-    <span>High Danger</span>
-  </div>
-  <div class="stat-item">
-    <h6 id="statDeaths">0</h6>
-    <span>Deaths</span>
-  </div>
-</div>
 
-<div class="action-btns">
-  <a href="report.html" class="btn green">Report</a>
-  <a href="alert.html" class="btn red">Alert</a>
-  <a href="radar.html" class="btn blue">Radar</a>
-  <a href="analytics.html" class="btn orange">Analytics</a>
-</div>
+  <div class="action-btns">
+    <a href="report.html" class="btn green">Report</a>
+    <a href="alert.html" class="btn red">Alert</a>
+    <a href="radar.html" class="btn blue">Radar</a>
+    <a href="analytics.html" class="btn orange">Analytics</a>
+  </div>
 
 </div>
 
@@ -206,7 +216,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   M.FormSelect.init(document.querySelectorAll('select'));
 
   const { db, ref, get, update, child } = window._fb;
-
   function getCookie(name){
     let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)");
     return m?m.pop():"";
@@ -262,12 +271,9 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
 
   document.getElementById("btnLogout").addEventListener("click",()=>{
-    // Clear cookies
     document.cookie = "emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    // Clear local and session storage
     localStorage.clear();
     sessionStorage.clear();
-    // Redirect to index.html
     window.location.href="index.html";
   });
 
@@ -296,7 +302,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("profileCard").addEventListener("click",()=>{
     M.Modal.getInstance(document.getElementById("editProfileModal")).open();
   });
-
 });
 </script>
 </body>
