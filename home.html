@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home - Elephant Monitoring App</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, update, child, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, update, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -22,11 +24,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-window._fb = { db, ref, get, update, child, onValue };
+window._fb = { db, ref, get, update, child };
 </script>
 
 <style>
-body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
+body { font-family: Roboto, sans-serif; background: #fafafa; margin: 0; }
 .container { padding: 8px; max-width: 420px; margin: 0 auto; }
 .card-thin { padding: 8px; border-radius: 10px; margin-bottom: 10px; cursor: pointer; }
 .profile-pic { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
@@ -35,13 +37,12 @@ body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
 .stat-item h6 { margin: 0; font-weight: bold; }
 .action-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 10px; }
 .fixed-btn { position: fixed; bottom: 16px; right: 16px; z-index: 1000; }
-.ai-btn { position: fixed; bottom: 16px; left: 16px; background: #2e7d32; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; color: white; z-index: 1000; }
+.ai-btn { position: fixed; bottom: 16px; left: 16px; background: #2e7d32; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; color: white; }
 </style>
 </head>
 <body>
 
 <div class="container">
-
   <div class="card white card-thin" id="profileCard">
     <div class="valign-wrapper">
       <img id="profilePic" src="" class="profile-pic">
@@ -66,12 +67,12 @@ body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
     <a href="radar.html" class="btn blue">Radar</a>
     <a href="analytics.html" class="btn orange">Analytics</a>
   </div>
-
 </div>
 
 <a href="report.html" class="btn-floating btn-large green fixed-btn"><i class="material-icons">add</i></a>
 <a href="chatbot.html" class="ai-btn"><i class="material-icons">smart_toy</i></a>
 
+<!-- Profile Modal -->
 <div id="editProfileModal" class="modal">
   <div class="modal-content">
     <h5>Edit Profile</h5>
@@ -91,6 +92,7 @@ body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
   </div>
 </div>
 
+<!-- Agent Registration Modal -->
 <div id="agentModal" class="modal">
   <div class="modal-content">
     <h5>Agent Registration</h5>
@@ -104,85 +106,91 @@ body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
   </div>
 </div>
 
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
   M.Modal.init(document.querySelectorAll('.modal'));
   M.FormSelect.init(document.querySelectorAll('select'));
 
-  const { db, ref, get, update, child, onValue } = window._fb;
-  function getCookie(name){ let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)"); return m?m.pop():""; }
-  const userId=getCookie("emaId");
-  if(!userId){window.location.href="index.html";return;}
+  const districts=["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
+  const districtSelect=document.getElementById("editDistrict");
+  const agentDistrictSelect=document.getElementById("agentDistrict");
+  districts.forEach(d=>{
+    let opt=document.createElement("option");
+    opt.value=d; opt.textContent=d;
+    districtSelect.appendChild(opt.cloneNode(true));
+    agentDistrictSelect.appendChild(opt);
+  });
+  M.FormSelect.init(document.querySelectorAll('select'));
 
-  // Load profile
+  const { db, ref, get, update, child } = window._fb;
+  function getCookie(name){let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)");return m?m.pop():"";}
+  const userId=getCookie("emaId"); if(!userId){window.location.href="index.html";return;}
+
+  // Load profile + stats
   get(child(ref(db),"users/"+userId)).then(snap=>{
     if(snap.exists()){
       const u=snap.val();
       document.getElementById("profilePic").src=u.picBase64||"";
       document.getElementById("profileName").textContent=u.name;
       document.getElementById("profileEmail").textContent=u.email;
-
       if(u.agentId){
-        document.getElementById("agentStatus").textContent="Agent Status: Agent ("+u.agentId+")";
-        localStorage.setItem("agentId", u.agentId);
+        document.getElementById("agentStatus").textContent="Agent ("+u.agentId+")";
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#!" id="btnUnregister" class="btn red">Unregister as Agent</a>';
+        document.getElementById("btnUnregister").addEventListener("click",()=>{update(ref(db,"users/"+userId),{agentId:null,agentInfo:null});localStorage.removeItem("agentId");document.cookie="agentId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";location.reload();});
+        // Save agentId in cookie + localStorage
+        localStorage.setItem("agentId",u.agentId);
         document.cookie="agentId="+u.agentId+"; path=/";
-        document.getElementById("agentButtonContainer").innerHTML='<a href="#!" id="btnUnregister" class="btn red">Unregister</a>';
-        document.getElementById("btnUnregister").addEventListener("click",()=>{
-          update(ref(db,"users/"+userId),{agentId:null,agentInfo:null}).then(()=>{
-            localStorage.removeItem("agentId");
-            document.cookie="agentId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-            location.reload();
-          });
-        });
       }else{
-        document.getElementById("agentButtonContainer").innerHTML='<a href="#agentModal" class="btn modal-trigger green">Become Agent</a>';
-        M.Modal.init(document.querySelectorAll('.modal'));
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#agentModal" class="btn modal-trigger green">Want to be an Agent?</a>';
+        M.Modal.init(document.querySelectorAll(".modal"));
       }
-      document.getElementById("editName").value=u.name||"";
-      document.getElementById("editEmail").value=u.email||"";
-      document.getElementById("editMobile").value=u.mobile||"";
-      document.getElementById("editDistrict").value=u.district||"";
-      M.updateTextFields(); M.FormSelect.init(document.querySelectorAll('select'));
+      document.getElementById("editName").value=u.name;
+      document.getElementById("editEmail").value=u.email;
+      document.getElementById("editMobile").value=u.mobile;
+      document.getElementById("editDistrict").value=u.district;
+      M.updateTextFields(); M.FormSelect.init(document.querySelectorAll("select"));
     }
   });
 
+  // Save profile
+  document.getElementById("btnSaveProfile").addEventListener("click",async()=>{
+    const file=document.getElementById("editPic").files[0];
+    let updates={name:editName.value,email:editEmail.value,mobile:editMobile.value,district:editDistrict.value};
+    if(file){
+      const reader=new FileReader();
+      reader.onload=async()=>{updates.picBase64=reader.result; await update(ref(db,"users/"+userId),updates); location.reload();};
+      reader.readAsDataURL(file);
+    }else{await update(ref(db,"users/"+userId),updates); location.reload();}
+  });
+
+  // Logout
+  document.getElementById("btnLogout").addEventListener("click",()=>{
+    document.cookie="emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    localStorage.clear(); sessionStorage.clear();
+    window.location.href="index.html";
+  });
+
+  // Register Agent
   document.getElementById("btnRegisterAgent").addEventListener("click",async()=>{
     const agentId="EA-"+Math.floor(1000+Math.random()*9000);
-    const info={name:document.getElementById("agentName").value,nic:document.getElementById("agentNIC").value,phone:document.getElementById("agentPhone").value,district:document.getElementById("agentDistrict").value};
+    const info={name:agentName.value,nic:agentNIC.value,phone:agentPhone.value,district:agentDistrict.value};
     await update(ref(db,"users/"+userId),{agentId,agentInfo:info});
     localStorage.setItem("agentId",agentId);
     document.cookie="agentId="+agentId+"; path=/";
     location.reload();
   });
 
-  document.getElementById("btnLogout").addEventListener("click",()=>{
-    document.cookie="emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    document.cookie="agentId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    localStorage.clear(); sessionStorage.clear(); window.location.href="index.html";
-  });
-
-  // Live stats based on reports
-  onValue(ref(db,"reports"),snap=>{
+  // Stats = count reports dynamically
+  get(ref(db,"reports")).then(snap=>{
     if(snap.exists()){
-      let elephants=0,reports=0,danger=0,deaths=0;
-      snap.forEach(r=>{
-        reports++;
-        let data=r.val();
-        if(data.elephantCount) elephants+=parseInt(data.elephantCount);
-        if(data.danger==="High") danger++;
-        if(data.incidentType==="Death") deaths++;
-      });
-      document.getElementById("statElephants").textContent=elephants;
-      document.getElementById("statReports").textContent=reports;
-      document.getElementById("statDanger").textContent=danger;
-      document.getElementById("statDeaths").textContent=deaths;
+      const reports=snap.val(); let elephants=0, count=0, danger=0, deaths=0;
+      Object.values(reports).forEach(r=>{count++; elephants+=r.elephants||0; if(r.danger==="High") danger++; if(r.incident==="Death") deaths++;});
+      statElephants.textContent=elephants; statReports.textContent=count; statDanger.textContent=danger; statDeaths.textContent=deaths;
     }
   });
 
-  document.getElementById("profileCard").addEventListener("click",()=>M.Modal.getInstance(document.getElementById("editProfileModal")).open());
+  profileCard.addEventListener("click",()=>{M.Modal.getInstance(editProfileModal).open();});
 });
 </script>
 </body>
