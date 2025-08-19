@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar - Elephant Monitoring</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<style>
+body, html { margin:0; padding:0; height:100%; width:100%; }
+#map { height:100%; width:100%; }
+.control-panel { position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.3);}
+.modal { max-width:400px; }
+</style>
+</head>
+<body>
+
+<div class="control-panel">
+  <select id="layerSelect">
+    <option value="sightings" selected>Sightings</option>
+    <option value="accidents">Accidents</option>
+  </select>
+  <button id="themeToggle" class="btn green">Satellite View</button>
+  <button onclick="location.href='home.html'" class="btn blue">Home</button>
+</div>
+
+<div id="map"></div>
+
+<!-- Info Modal -->
+<div id="infoModal" class="modal">
+  <div class="modal-content">
+    <h5>Report Info</h5>
+    <div id="infoContent"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" id="falseReportBtn" class="btn red">False Information Reported!</a>
+    <a href="#!" class="modal-close btn grey">Close</a>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+document.addEventListener("DOMContentLoaded",()=>{
+  M.FormSelect.init(document.querySelectorAll("select"));
+  M.Modal.init(document.querySelectorAll(".modal"));
+});
+
+let map = L.map('map').setView([7.8731, 80.7718], 7); 
+let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+terrainLayer.addTo(map);
+let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+let currentLayer = terrainLayer;
+
+let userMarker = null;
+let circles = [];
+let markers = [];
+let selectedLayer = 'sightings';
+let infoModal = M.Modal.getInstance(document.getElementById("infoModal"));
+let userLatLng = null;
+
+navigator.geolocation.getCurrentPosition(pos=>{
+  userLatLng = [pos.coords.latitude, pos.coords.longitude];
+  if(userMarker) userMarker.remove();
+  userMarker = L.marker(userLatLng).addTo(map).bindPopup("You are here").openPopup();
+  reverseGeocode(userLatLng);
+  map.setView(userLatLng, 10);
+});
+
+async function reverseGeocode(latlng){
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng[0]}&lon=${latlng[1]}`);
+    const data = await res.json();
+    console.log("You are at:", data.display_name);
+  }catch(e){ console.log(e);}
+}
+
+document.getElementById("layerSelect").addEventListener("change",e=>{
+  selectedLayer = e.target.value;
+  loadReports();
+});
+
+document.getElementById("themeToggle").addEventListener("click",()=>{
+  map.removeLayer(currentLayer);
+  if(currentLayer===terrainLayer){
+    satelliteLayer.addTo(map);
+    currentLayer = satelliteLayer;
+  }else{
+    terrainLayer.addTo(map);
+    currentLayer = terrainLayer;
+  }
+});
+
+async function loadReports(){
+  circles.forEach(c=>map.removeLayer(c));
+  markers.forEach(m=>map.removeLayer(m));
+  circles=[]; markers=[];
+  const snap = await get(ref(db,"reports"));
+  if(!snap.exists()) return;
+  const data = snap.val();
+  const now = new Date().getTime();
+  Object.entries(data).forEach(([type,reports])=>{
+    if(selectedLayer!=="all" && type!==selectedLayer) return;
+    Object.entries(reports).forEach(([id,report])=>{
+      const reportTime = new Date(report.time).getTime();
+      if(now - reportTime > 24*60*60*1000) return;
+      let markerOptions = {};
+      if(type==='accidents') markerOptions={icon:L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png',iconSize:[32,32]})};
+      const marker = L.marker([report.lat,report.lng], markerOptions).addTo(map);
+      markers.push(marker);
+      if(type==='sightings'){
+        const hoursPassed = Math.floor((now - reportTime)/3600000);
+        const radius = 100 + hoursPassed*50;
+        const circle = L.circle([report.lat,report.lng],{radius,color:'orange',fillOpacity:0.2}).addTo(map);
+        circles.push(circle);
+        if(userLatLng){
+          const dist = map.distance(userLatLng,[report.lat,report.lng]);
+          if(dist<radius){
+            M.toast({html:"⚠ You're in a predicted elephant sighting range. Proceed with caution!",displayLength:4000});
+            if(Notification.permission==='granted'){
+              new Notification("Elephant Warning","You're in an elephant sighting area. Proceed with caution!");
+            }
+          }
+        }
+      }
+      marker.on("click",()=>{
+        document.getElementById("infoContent").innerHTML=`
+          <p><b>District:</b> ${report.district}</p>
+          <p><b>Type:</b> ${type}</p>
+          <p><b>Time:</b> ${report.time}</p>
+        `;
+        infoModal.open();
+        document.getElementById("falseReportBtn").onclick=async()=>{
+          await push(ref(db,"falseonmap"),{reportId:id,type:type,time:new Date().toISOString()});
+          M.toast({html:"We'll take necessary actions. Stay updated.",displayLength:4000});
+        };
+      });
+    });
+  });
+}
+
+if("Notification" in window) Notification.requestPermission();
+loadReports();
+</script>
+</body>
+</html>
