@@ -10,6 +10,11 @@
   <style>
     body { background:#f4f4f4; }
     nav { background:#2e7d32; }
+    .brand-logo { font-size:1.6rem !important; } /* smaller on mobile */
+    @media(max-width:600px){
+      .brand-logo { font-size:1.3rem !important; }
+      #whyBtn { font-size:0.75rem !important; padding:0 8px; }
+    }
     .card { border-radius:12px; margin-bottom:20px; }
     .card-content img { width:100px; height:100px; object-fit:cover; border-radius:8px; margin:5px; cursor:pointer; }
     .delete-btn { color:red; cursor:pointer; }
@@ -154,6 +159,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 let deleteTarget=null;
 let deleteReportData=null;
+let mapInstance=null; // fix multiple map init
 
 // Load Reports
 async function loadReports(){
@@ -218,18 +224,18 @@ function renderReports(data){
         });
       }
 
-      // Map button
+      // Map button (fix)
       card.querySelector(".map-btn").addEventListener("click",(e)=>{
-        const lat=e.target.getAttribute("data-lat");
-        const lng=e.target.getAttribute("data-lng");
+        const lat=parseFloat(e.target.getAttribute("data-lat"));
+        const lng=parseFloat(e.target.getAttribute("data-lng"));
         const district=e.target.getAttribute("data-district");
         const mapModal=document.getElementById("mapModal");
         M.Modal.getInstance(mapModal).open();
         setTimeout(()=>{
-          document.getElementById("mapPopup").innerHTML=""; // reset
-          const map=L.map("mapPopup").setView([lat,lng],12);
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-          L.marker([lat,lng]).addTo(map).bindPopup(district).openPopup();
+          if(mapInstance){ mapInstance.remove(); } // destroy old
+          mapInstance=L.map("mapPopup").setView([lat,lng],12);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mapInstance);
+          L.marker([lat,lng]).addTo(mapInstance).bindPopup(district).openPopup();
         },200);
       });
 
@@ -246,7 +252,7 @@ function renderReports(data){
         M.Modal.getInstance(document.getElementById("imagesModal")).open();
       });
 
-      // PDF button
+      // PDF button (fix)
       card.querySelector(".pdf-btn").addEventListener("click",(e)=>{
         const { jsPDF } = window.jspdf;
         const doc=new jsPDF();
@@ -280,7 +286,7 @@ function renderReports(data){
   M.FormSelect.init(districtSelect);
 }
 
-// Delete confirm
+// Delete confirm (fix agent info)
 document.getElementById("deleteReasonSelect").addEventListener("change",e=>{
   document.getElementById("otherReasonField").style.display=e.target.value==="Other"?"block":"none";
 });
@@ -297,11 +303,20 @@ document.getElementById("confirmDelete").addEventListener("click",async()=>{
   if(!agree){ alert("You must confirm agreement."); return; }
 
   if(deleteTarget && deleteReportData){
+    // get agent info
+    let agentName="Unknown", agentMobile="Unknown";
+    const agentSnap=await get(ref(db,"users/"+agentId+"/agentInfo"));
+    if(agentSnap.exists()){
+      const info=agentSnap.val();
+      agentName=info.name||"Unknown";
+      agentMobile=info.mobile||"Unknown";
+    }
+
     await set(ref(db,"deletedReports/"+deleteTarget.id),{
       ...deleteReportData,
       deletedBy:agentId,
-      agentName:"Unknown (Unknown)",
-      agentMobile:"Unknown",
+      agentName,
+      agentMobile,
       reason:reason,
       timestamp:new Date().toISOString()
     });
