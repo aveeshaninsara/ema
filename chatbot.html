@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ali AI - Sri Lanka Wildlife Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #4CAF50;
+      color: white;
+      text-align: center;
+      padding: 1em 0;
+    }
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      height: 80vh;
+      overflow: hidden;
+    }
+    .chat-box {
+      padding: 20px;
+      flex-grow: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-input {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ddd;
+    }
+    .chat-input input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      margin-right: 10px;
+    }
+    .chat-input button {
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .chat-input button:hover {
+      background-color: #45a049;
+    }
+    .message {
+      max-width: 70%;
+      margin: 5px 0;
+      padding: 10px 15px;
+      border-radius: 20px;
+      word-wrap: break-word;
+      line-height: 1.4;
+      animation: fadeIn 0.3s;
+    }
+    .user-message {
+      background-color: #DCF8C6;
+      align-self: flex-end;
+      border-bottom-right-radius: 0;
+    }
+    .bot-message {
+      background-color: #FFF;
+      border: 1px solid #ddd;
+      align-self: flex-start;
+      border-bottom-left-radius: 0;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ali AI - Sri Lanka Wildlife</h1>
+  </header>
+
+  <div class="chat-container">
+    <div id="chatBox" class="chat-box"></div>
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Ask about Sri Lanka wildlife or tourism...">
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById('chatBox');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    const API_KEY = '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';
+    const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+    const systemMessage = {
+      role: 'system',
+      content: `
+      You are Ali AI. Speak only about Sri Lanka wildlife, eco-tourism, conservation, and national parks. 
+      Keep responses short, clear, and friendly. 
+      If asked about EMA, respond: "Aveesha Ninsara Pelawaththa is the creator of EMA - Elephant Monitoring App." 
+      If the question is unrelated, politely decline. 
+      Fluent in Sinhala and Tamil.
+      `
+    };
+
+    function addMessage(content, sender) {
+      const message = document.createElement('div');
+      message.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+      message.textContent = content;
+      chatBox.appendChild(message);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const userText = userInput.value.trim();
+      if (!userText) return;
+      addMessage(userText, 'user');
+      userInput.value = '';
+
+      const loadingMessage = document.createElement('div');
+      loadingMessage.classList.add('message', 'bot-message');
+      loadingMessage.textContent = '...';
+      chatBox.appendChild(loadingMessage);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-4o-mini', // smaller, multilingual, fast & free
+            messages: [
+              systemMessage,
+              { role: 'user', content: userText }
+            ],
+            temperature: 0.5,
+            max_tokens: 120
+          })
+        });
+
+        const data = await response.json();
+        loadingMessage.remove();
+
+        if (data.choices && data.choices.length > 0) {
+          const botReply = data.choices[0].message.content;
+          addMessage(botReply, 'bot');
+        } else {
+          addMessage('Sorry, I couldn’t understand.', 'bot');
+        }
+      } catch (error) {
+        loadingMessage.remove();
+        addMessage('Error connecting to chatbot.', 'bot');
+        console.error(error);
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', e => { if(e.key==='Enter') sendMessage(); });
+  </script>
+</body>
+</html>
