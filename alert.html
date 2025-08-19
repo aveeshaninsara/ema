@@ -11,9 +11,11 @@
     body { background:#f4f4f4; }
     nav { background:#2e7d32; }
     .card { border-radius:12px; margin-bottom:20px; }
-    .card-content img { width:100px; height:100px; object-fit:cover; border-radius:8px; cursor:pointer; margin:5px; }
-    .map-container { height:250px; margin-top:10px; border-radius:8px; }
+    .card-content img { width:100px; height:100px; object-fit:cover; border-radius:8px; margin:5px; cursor:pointer; }
     .delete-btn { color:red; cursor:pointer; }
+    .action-buttons a { margin-right:10px; }
+    .modal img { width:100%; border-radius:8px; margin-bottom:10px; }
+    #mapPopup { height:400px; }
   </style>
 </head>
 <body>
@@ -91,6 +93,28 @@
   </div>
 </div>
 
+<!-- Map Popup -->
+<div id="mapModal" class="modal">
+  <div class="modal-content">
+    <h5>Report Location</h5>
+    <div id="mapPopup"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" class="modal-close btn grey">Close</a>
+  </div>
+</div>
+
+<!-- Images Popup -->
+<div id="imagesModal" class="modal">
+  <div class="modal-content">
+    <h5>Report Images</h5>
+    <div id="imagesContainer"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" class="modal-close btn grey">Close</a>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -98,7 +122,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, remove, set, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, remove, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -129,8 +153,7 @@ async function loadReports(){
     document.getElementById("reportsContainer").innerHTML="<p>No reports available.</p>";
     return;
   }
-  const data = snap.val();
-  renderReports(data);
+  renderReports(snap.val());
 }
 
 function renderReports(data){
@@ -151,20 +174,17 @@ function renderReports(data){
           <p><b>Danger:</b> ${report.dangerLevel||"N/A"}</p>
           <p><b>Description:</b> ${report.description||"N/A"}</p>
           <p><b>Time:</b> ${report.time||"N/A"}</p>
-          <div class="map-container" id="map-${id}"></div>
         </div>
-        <div class="card-action">
-          ${localStorage.getItem("agentId")?`<a href="#!" class="delete-btn" data-id="${id}" data-type="${type}">Delete</a>`:""}
+        <div class="card-action action-buttons">
+          <a href="#!" class="btn green map-btn" data-lat="${report.lat}" data-lng="${report.lng}" data-district="${report.district}">Map</a>
+          <a href="#!" class="btn blue image-btn" data-images='${JSON.stringify(report.images||{})}'>Images</a>
+          <a href="#!" class="btn orange pdf-btn" data-report='${JSON.stringify(report)}'>PDF</a>
+          ${localStorage.getItem("agentId")?`<a href="#!" class="delete-btn right" data-id="${id}" data-type="${type}">Delete</a>`:""}
         </div>
       `;
       container.appendChild(card);
 
-      if(report.lat && report.lng){
-        const map=L.map(`map-${id}`).setView([report.lat,report.lng],12);
-        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}").addTo(map);
-        L.marker([report.lat,report.lng]).addTo(map).bindPopup(`${report.district||""}`);
-      }
-
+      // Delete button handler
       const delBtn=card.querySelector(".delete-btn");
       if(delBtn){
         delBtn.addEventListener("click",()=>{
@@ -173,11 +193,52 @@ function renderReports(data){
           M.Modal.getInstance(document.getElementById("deleteModal")).open();
         });
       }
+
+      // Map button handler
+      card.querySelector(".map-btn").addEventListener("click",(e)=>{
+        const lat=e.target.getAttribute("data-lat");
+        const lng=e.target.getAttribute("data-lng");
+        const district=e.target.getAttribute("data-district");
+        const mapModal=document.getElementById("mapModal");
+        M.Modal.getInstance(mapModal).open();
+        setTimeout(()=>{
+          const map=L.map("mapPopup").setView([lat,lng],12);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+          L.marker([lat,lng]).addTo(map).bindPopup(district).openPopup();
+        },200);
+      });
+
+      // Image button handler
+      card.querySelector(".image-btn").addEventListener("click",(e)=>{
+        const imgs=JSON.parse(e.target.getAttribute("data-images"));
+        const container=document.getElementById("imagesContainer");
+        container.innerHTML="";
+        Object.values(imgs).forEach(img=>{
+          const el=document.createElement("img");
+          el.src=img;
+          container.appendChild(el);
+        });
+        M.Modal.getInstance(document.getElementById("imagesModal")).open();
+      });
+
+      // PDF button handler
+      card.querySelector(".pdf-btn").addEventListener("click",(e)=>{
+        const { jsPDF } = window.jspdf;
+        const doc=new jsPDF();
+        const report=JSON.parse(e.target.getAttribute("data-report"));
+        doc.text("Elephant Report",20,20);
+        doc.text(`District: ${report.district}`,20,30);
+        doc.text(`Elephants: ${report.numElephants}`,20,40);
+        doc.text(`Danger: ${report.dangerLevel}`,20,50);
+        doc.text(`Description: ${report.description}`,20,60);
+        doc.text(`Time: ${report.time}`,20,70);
+        doc.save("report.pdf");
+      });
     });
   });
 }
 
-// Confirm Delete
+// Delete confirm
 document.getElementById("deleteReasonSelect").addEventListener("change",e=>{
   document.getElementById("otherReasonField").style.display=e.target.value==="Other"?"block":"none";
 });
@@ -194,19 +255,14 @@ document.getElementById("confirmDelete").addEventListener("click",async()=>{
   if(!agree){ alert("You must confirm agreement."); return; }
 
   if(deleteTarget && deleteReportData){
-    // Fetch agent info
-    const userSnap=await get(ref(db,"users/"+agentId));
-    const agentData=userSnap.exists()?userSnap.val():{name:"Unknown",mobile:"Unknown"};
-
     await set(ref(db,"deletedReports/"+deleteTarget.id),{
       ...deleteReportData,
       deletedBy:agentId,
-      agentName:agentData.name,
-      agentMobile:agentData.mobile,
+      agentName:"Unknown (Unknown)",
+      agentMobile:"Unknown",
       reason:reason,
       timestamp:new Date().toISOString()
     });
-
     await remove(ref(db,`reports/${deleteTarget.type}/${deleteTarget.id}`));
     deleteTarget=null; deleteReportData=null;
     M.Modal.getInstance(document.getElementById("deleteModal")).close();
@@ -251,7 +307,6 @@ document.getElementById("whyBtn").addEventListener("click",async()=>{
   }
 });
 
-// Load
 document.getElementById("filterSelect").addEventListener("change",()=>loadReports());
 loadReports();
 </script>
