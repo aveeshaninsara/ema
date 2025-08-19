@@ -10,17 +10,18 @@
   <style>
     body { background:#f4f4f4; }
     nav { background:#2e7d32; }
-    .brand-logo { font-size:1.6rem !important; } /* smaller on mobile */
+    .brand-logo { font-size:1.6rem !important; } 
     @media(max-width:600px){
-      .brand-logo { font-size:1.3rem !important; }
-      #whyBtn { font-size:0.75rem !important; padding:0 8px; }
+      .brand-logo { font-size:1.2rem !important; }
+      nav i { font-size:1.5rem !important; }
     }
-    .card { border-radius:12px; margin-bottom:20px; }
+    .card { border-radius:12px; margin-bottom:20px; box-shadow:0 4px 8px rgba(0,0,0,0.1); }
     .card-content img { width:100px; height:100px; object-fit:cover; border-radius:8px; margin:5px; cursor:pointer; }
     .delete-btn { color:red; cursor:pointer; }
-    .action-buttons a { margin-right:10px; }
+    .action-buttons a { margin-right:8px; margin-bottom:5px; }
     .modal img { width:100%; border-radius:8px; margin-bottom:10px; }
     #mapPopup { height:400px; }
+    .popup-msg { padding:15px; text-align:center; }
   </style>
 </head>
 <body>
@@ -33,13 +34,13 @@
       <li><a href="home.html"><i class="material-icons">home</i></a></li>
     </ul>
     <ul class="right">
-      <li><a href="#!" id="whyBtn">Why my report is not showing?</a></li>
+      <li><a href="#!" id="whyBtn">Why not showing?</a></li>
     </ul>
   </div>
 </nav>
 
 <div class="container">
-  <!-- Filter -->
+  <!-- Filters -->
   <div class="row">
     <div class="input-field col s6">
       <select id="filterSelect">
@@ -65,7 +66,7 @@
 <div id="deleteModal" class="modal">
   <div class="modal-content">
     <h5>Confirm Delete</h5>
-    <p>Are you sure you want to delete this report?</p>
+    <p>Provide details before deleting:</p>
     <div class="input-field">
       <input id="agentIdInput" type="text">
       <label for="agentIdInput">Enter Agent ID</label>
@@ -129,6 +130,16 @@
   </div>
 </div>
 
+<!-- General Message Modal -->
+<div id="msgModal" class="modal">
+  <div class="modal-content">
+    <div id="msgContent" class="popup-msg"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" class="modal-close btn green">OK</a>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -159,7 +170,13 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 let deleteTarget=null;
 let deleteReportData=null;
-let mapInstance=null; // fix multiple map init
+let mapInstance=null;
+
+// Utility to show modal message
+function showMessage(msg){
+  document.getElementById("msgContent").innerText=msg;
+  M.Modal.getInstance(document.getElementById("msgModal")).open();
+}
 
 // Load Reports
 async function loadReports(){
@@ -224,15 +241,14 @@ function renderReports(data){
         });
       }
 
-      // Map button (fix)
+      // Map button
       card.querySelector(".map-btn").addEventListener("click",(e)=>{
         const lat=parseFloat(e.target.getAttribute("data-lat"));
         const lng=parseFloat(e.target.getAttribute("data-lng"));
         const district=e.target.getAttribute("data-district");
-        const mapModal=document.getElementById("mapModal");
-        M.Modal.getInstance(mapModal).open();
+        M.Modal.getInstance(document.getElementById("mapModal")).open();
         setTimeout(()=>{
-          if(mapInstance){ mapInstance.remove(); } // destroy old
+          if(mapInstance){ mapInstance.remove(); }
           mapInstance=L.map("mapPopup").setView([lat,lng],12);
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(mapInstance);
           L.marker([lat,lng]).addTo(mapInstance).bindPopup(district).openPopup();
@@ -252,7 +268,7 @@ function renderReports(data){
         M.Modal.getInstance(document.getElementById("imagesModal")).open();
       });
 
-      // PDF button (fix)
+      // PDF button
       card.querySelector(".pdf-btn").addEventListener("click",(e)=>{
         const { jsPDF } = window.jspdf;
         const doc=new jsPDF();
@@ -286,7 +302,7 @@ function renderReports(data){
   M.FormSelect.init(districtSelect);
 }
 
-// Delete confirm (fix agent info)
+// Delete confirm
 document.getElementById("deleteReasonSelect").addEventListener("change",e=>{
   document.getElementById("otherReasonField").style.display=e.target.value==="Other"?"block":"none";
 });
@@ -298,12 +314,11 @@ document.getElementById("confirmDelete").addEventListener("click",async()=>{
   if(reason==="Other") reason=document.getElementById("deleteReasonOther").value;
   const agree=document.getElementById("agreementCheck").checked;
 
-  if(!inputId || inputId!==agentId){ alert("Agent ID incorrect."); return; }
-  if(!reason.trim()){ alert("Please provide a reason."); return; }
-  if(!agree){ alert("You must confirm agreement."); return; }
+  if(!inputId || inputId!==agentId){ showMessage("Agent ID incorrect."); return; }
+  if(!reason.trim()){ showMessage("Please provide a reason."); return; }
+  if(!agree){ showMessage("You must confirm agreement."); return; }
 
   if(deleteTarget && deleteReportData){
-    // get agent info
     let agentName="Unknown", agentMobile="Unknown";
     const agentSnap=await get(ref(db,"users/"+agentId+"/agentInfo"));
     if(agentSnap.exists()){
@@ -324,16 +339,17 @@ document.getElementById("confirmDelete").addEventListener("click",async()=>{
     deleteTarget=null; deleteReportData=null;
     M.Modal.getInstance(document.getElementById("deleteModal")).close();
     loadReports();
+    showMessage("Report deleted successfully.");
   }
 });
 
-// Why my report not showing
+// Why not showing
 document.getElementById("whyBtn").addEventListener("click",async()=>{
   const emaId=localStorage.getItem("emaId");
-  if(!emaId){ alert("You must be logged in as a reporter."); return; }
+  if(!emaId){ showMessage("You must be logged in as a reporter."); return; }
 
   const snap=await get(ref(db,"deletedReports"));
-  if(!snap.exists()){ alert("No deleted reports found."); return; }
+  if(!snap.exists()){ showMessage("No deleted reports found."); return; }
   const data=snap.val();
 
   let found=null, foundId=null;
@@ -346,7 +362,7 @@ document.getElementById("whyBtn").addEventListener("click",async()=>{
       <p><b>Reason:</b> ${found.reason}</p>
       <p><b>Agent:</b> ${found.agentName} (${found.agentMobile})</p>
       <p><b>Time:</b> ${found.timestamp}</p>
-      <p><b>Description:</b> ${found.description}</p>
+      <p><b>Description:</b> ${found.description||"N/A"}</p>
     `;
     M.Modal.getInstance(document.getElementById("deletedInfoModal")).open();
 
@@ -355,12 +371,12 @@ document.getElementById("whyBtn").addEventListener("click",async()=>{
       M.Modal.getInstance(document.getElementById("deletedInfoModal")).close();
     };
     document.getElementById("declineDelete").onclick=async()=>{
-      alert("We're taking actions about it. It may take up-to 2 to 3 days. Stay Updated");
       await set(ref(db,"deletedReports/"+foundId+"/actionNeeded"),true);
+      showMessage("We're taking actions. It may take 2-3 days.");
       M.Modal.getInstance(document.getElementById("deletedInfoModal")).close();
     };
   }else{
-    alert("No deleted reports found for your account.");
+    showMessage("No deleted reports found for your account.");
   }
 });
 
