@@ -6,171 +6,172 @@
 <title>EMA Radar</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
-#map { height:100%; width:100%; }
-#settingsBtn, #layerBtn { position:absolute; top:10px; z-index:1000; padding:10px; border:none; border-radius:6px; cursor:pointer; background:#2e7d32; color:#fff; }
-#settingsBtn { right:10px; }
-#layerBtn { left:10px; }
-#settingsPanel { position:absolute; top:50px; right:10px; background:#fff; padding:10px; border-radius:6px; box-shadow:0 4px 10px rgba(0,0,0,0.2); display:none; z-index:1000; }
-#settingsPanel label { display:block; margin:5px 0; }
-#settingsPanel input { width:100%; }
+  body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
+  #map { height:100%; width:100%; }
+  .leaflet-control-layers { max-height: 150px; overflow-y: auto; }
+  #settingsPanel {
+    position: absolute; top: 10px; right: 10px; background:white; padding:10px; border-radius:8px; z-index:1000;
+    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  #settingsPanel label { display:block; margin-top:5px; font-size:14px; }
+  #settingsPanel input { width: 100%; margin-top:2px; }
+  #togglePanel { position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:5px; border-radius:5px; }
 </style>
 </head>
 <body>
-<button id="settingsBtn">Settings</button>
-<button id="layerBtn">Satellite View</button>
+<div id="map"></div>
+<div id="togglePanel">
+  <label for="reportType">Show:</label>
+  <select id="reportType">
+    <option value="sightings">Sightings</option>
+    <option value="accidents">Accidents</option>
+  </select>
+</div>
 <div id="settingsPanel">
+  <h4>Settings</h4>
   <label>Notification Radius (meters):
-    <input type="number" id="notifRadius" min="50" value="200">
+    <input type="number" id="notifRadius" value="500"/>
+  </label>
+  <label>Alert Distance (meters):
+    <input type="number" id="alertDistance" value="100"/>
+  </label>
+  <label>Notification Enabled:
+    <input type="checkbox" id="notifEnabled" checked/>
   </label>
 </div>
-<div id="map"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-// Firebase initialization
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
   authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "elephant-monitoring-app-99ffd",
-  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
   messagingSenderId: "649960879930",
-  appId: "1:649960879930:web:d6f703cea9029a2fd14203"
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  measurementId: "G-GSQEVX635R"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Map
-let map = L.map('map').fitWorld();
-const terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'});
-const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri'});
-terrainLayer.addTo(map);
-let currentLayer='terrain';
+let map = L.map('map').setView([7.8731, 80.7718], 7);
+let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+let layers = {"Terrain": terrainLayer, "Satellite": satelliteLayer};
+L.control.layers(layers).addTo(map);
 
-// Layer toggle
-const layerBtn = document.getElementById('layerBtn');
-layerBtn.onclick = ()=>{
-  if(currentLayer==='terrain'){ map.removeLayer(terrainLayer); satelliteLayer.addTo(map); currentLayer='satellite'; layerBtn.textContent='Terrain View'; }
-  else { map.removeLayer(satelliteLayer); terrainLayer.addTo(map); currentLayer='terrain'; layerBtn.textContent='Satellite View'; }
-};
-
-// User location
 let userMarker;
-map.locate({setView:true, watch:true, maxZoom:16});
-map.on('locationfound', e=>{
-  if(userMarker) map.removeLayer(userMarker);
-  userMarker = L.marker(e.latlng).addTo(map).bindPopup("You are here").openPopup();
+let reportMarkers = [];
+let reportCircles = [];
+let notifRadius = 500;
+let alertDistance = 100;
+let notifEnabled = true;
+
+const reportTypeSelect = document.getElementById('reportType');
+const notifRadiusInput = document.getElementById('notifRadius');
+const alertDistanceInput = document.getElementById('alertDistance');
+const notifEnabledCheckbox = document.getElementById('notifEnabled');
+
+notifRadiusInput.addEventListener('change', ()=>{ notifRadius = parseInt(notifRadiusInput.value); });
+alertDistanceInput.addEventListener('change', ()=>{ alertDistance = parseInt(alertDistanceInput.value); });
+notifEnabledCheckbox.addEventListener('change', ()=>{ notifEnabled = notifEnabledCheckbox.checked; });
+reportTypeSelect.addEventListener('change', ()=>{ loadReports(); });
+
+// Get current location
+navigator.geolocation.watchPosition(pos=>{
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  if(!userMarker){
+    userMarker = L.marker([lat,lng]).addTo(map).bindPopup("You are here").openPopup();
+  } else userMarker.setLatLng([lat,lng]);
+  checkPredictedZones(lat,lng);
 });
 
-// Notification radius
-let notifRadius = localStorage.getItem('notifRadius')?parseInt(localStorage.getItem('notifRadius')):200;
-document.getElementById('notifRadius').value = notifRadius;
-document.getElementById('notifRadius').onchange = e=>{
-  notifRadius = parseInt(e.target.value);
-  localStorage.setItem('notifRadius', notifRadius);
-};
-
-// Settings toggle
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsPanel = document.getElementById('settingsPanel');
-settingsBtn.onclick = ()=> settingsPanel.style.display = settingsPanel.style.display==='none'?'block':'none';
-
-// Icons
-const accidentIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png',iconSize:[32,32]});
-const sightingIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',iconSize:[32,32]});
-
-// Fetch reports
-let markers = [];
-function fetchReports(){
-  markers.forEach(m=>map.removeLayer(m));
-  markers=[];
-  db.ref('reports').once('value').then(snapshot=>{
+// Load reports
+function loadReports(){
+  reportMarkers.forEach(m=>map.removeLayer(m));
+  reportCircles.forEach(c=>map.removeLayer(c));
+  reportMarkers=[]; reportCircles=[];
+  const type = reportTypeSelect.value;
+  db.ref('reports').once('value', snapshot=>{
     const now = new Date();
-    snapshot.forEach(child=>{
-      const data = child.val();
+    snapshot.forEach(snap=>{
+      const data = snap.val();
       const reportTime = new Date(data.time);
-      if((now-reportTime)/(1000*60*60)<=24){
-        const latlng=[data.lat,data.lng];
-        if(data.elephant && !data.human){
-          const circle = L.circle(latlng,{color:'blue',fillColor:'blue',fillOpacity:0.2,radius:50 + ((now-reportTime)/(1000*60*60))*20}).addTo(map);
-          markers.push(circle);
-          const marker = L.marker(latlng,{icon:sightingIcon}).addTo(map);
-          marker.bindPopup(`<b>Elephant Sighting</b><br>District: ${data.district}<br>Time: ${data.time}<br>
-          <button onclick="reportFalse('${child.key}')">False information reported!</button>`);
-          markers.push(marker);
-        }
-        if(data.human && data.elephant){
-          const marker = L.marker(latlng,{icon:accidentIcon}).addTo(map);
-          marker.bindPopup(`<b>Elephant Accident</b><br>District: ${data.district}<br>Time: ${data.time}<br>
-          <button onclick="reportFalse('${child.key}')">False information reported!</button>`);
-          markers.push(marker);
+      const diffHrs = (now-reportTime)/3600000;
+      if(diffHrs<=24){
+        const lat = data.lat;
+        const lng = data.lng;
+        let markerOptions = {};
+        if(type==='accidents' && data.accident){
+          markerOptions = {icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/565/565491.png',iconSize:[25,25]})};
+          const m = L.marker([lat,lng],markerOptions).addTo(map);
+          m.bindPopup(`<b>Elephant Accident</b><br>${data.district}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
+          reportMarkers.push(m);
+        } else if(type==='sightings' && data.elephant){
+          const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/616/616408.png',iconSize:[25,25]})}).addTo(map);
+          const circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
+          reportMarkers.push(m); reportCircles.push(circle);
+          m.bindPopup(`<b>Elephant Sighting</b><br>${data.district}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
         }
       }
     });
   });
 }
 
-// Report false info
-window.reportFalse = function(key){
-  db.ref('falseonmap/'+key).set({reported:true,time:new Date().toLocaleString()});
-  alert("We'll take necessary actions for it. Stay updated.");
+function reportFalse(key){
+  db.ref('falseonmap').push({report:key,time:new Date().toString()});
+  alert('We will take necessary actions. Stay updated.');
 }
 
-// Periodic fetch
-fetchReports();
-setInterval(fetchReports,60000);
-
-// Predicted zone notifications
-function checkPredictedZones(){
-  if(!userMarker) return;
-  const userLatLng = userMarker.getLatLng();
-  db.ref('reports').once('value').then(snapshot=>{
-    snapshot.forEach(child=>{
-      const data = child.val();
-      const reportTime = new Date(data.time);
-      const now = new Date();
-      if((now - reportTime)/(1000*60*60)<=24 && data.elephant && !data.human){
-        const latlng = L.latLng(data.lat,data.lng);
-        if(userLatLng.distanceTo(latlng)<=notifRadius){
-          notifyUser("You're in an elephant sighting area. Proceed with caution!");
-        }
+// Check predicted zones
+function checkPredictedZones(userLat,userLng){
+  if(!notifEnabled) return;
+  reportCircles.forEach(circle=>{
+    const center = circle.getLatLng();
+    const distance = map.distance([userLat,userLng],[center.lat,center.lng]);
+    if(distance <= notifRadius){
+      if("Notification" in window && Notification.permission==="granted"){
+        navigator.serviceWorker.ready.then(registration=>{
+          registration.showNotification("EMA Alert","You're in an elephant sighting range. Proceed with caution.");
+        });
       }
-    });
-  });
-}
-
-// Notifications
-function notifyUser(msg){
-  if(Notification.permission==='granted'){
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.ready.then(reg=>{
-        reg.showNotification("EMA Alert",{body:msg,icon:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png"});
-      });
-    } else {
-      new Notification("EMA Alert",{body:msg,icon:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png"});
     }
-  }
+  });
 }
-if(Notification.permission!=='granted') Notification.requestPermission();
-setInterval(checkPredictedZones,10000);
 
-// Register service worker from code
-if('serviceWorker' in navigator){
-  const swCode = `
-    self.addEventListener('install', e => { self.skipWaiting(); });
-    self.addEventListener('activate', e => { self.clients.claim(); });
-    self.addEventListener('push', e => {
-      const data = e.data.json();
-      self.registration.showNotification(data.title,{body:data.body,icon:data.icon});
-    });
-  `;
-  const blob = new Blob([swCode], {type: 'application/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(blob));
+// Initial load
+loadReports();
+
+// Request notification permission
+if("Notification" in window){
+  Notification.requestPermission();
 }
+
+// Register Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+
+<script>
+// Service Worker (inline)
+const swCode = `
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { self.clients.claim(); });
+self.addEventListener('push', e => { 
+  const data = e.data.json(); 
+  self.registration.showNotification(data.title, {body:data.body,icon:data.icon||''});
+});
+`;
+const blob = new Blob([swCode],{type:'application/javascript'});
+navigator.serviceWorker.register(URL.createObjectURL(blob));
 </script>
 </body>
 </html>
