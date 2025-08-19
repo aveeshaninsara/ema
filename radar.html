@@ -31,11 +31,9 @@ button,select,input{margin:5px 0;padding:5px;}
   <button id="closeSettings">Close Settings</button>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
-// Firebase setup
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, onValue, set, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { getDatabase, ref, get, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -51,59 +49,57 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Map setup
 let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
 let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+let map = L.map('map', {layers:[terrainLayer]}).setView([7.8731,80.7718],7);
 
-let map = L.map('map', {layers:[terrainLayer]}).setView([7.8731, 80.7718], 7);
-
-let reportMarkers=[], reportCircles=[];
+let reportMarkers = [];
+let reportCircles = [];
 let reportTypeSelect = document.getElementById('reportType');
 let notifRadiusInput = document.getElementById('notifRadiusInput');
 let notifRadius = parseInt(localStorage.getItem('notifRadius')||500);
 
 function reportFalse(key){
-  const val = prompt("Reason for false report?");
-  if(val){
-    push(ref(db,'falseonmap'),{reportKey:key, reason:val, time:new Date().toLocaleString()});
+  const reason = prompt("Reason for false report?");
+  if(reason){
+    push(ref(db,'falseonmap'),{reportKey:key, reason:reason, time:new Date().toLocaleString()});
     alert("We'll take necessary actions. Stay updated.");
   }
 }
 
-function loadReports(){
+async function loadReports(){
   reportMarkers.forEach(m=>map.removeLayer(m));
   reportCircles.forEach(c=>map.removeLayer(c));
   reportMarkers=[]; reportCircles=[];
   const type = reportTypeSelect.value;
   const now = new Date();
 
-  if(type==='sightings'){
-    onValue(ref(db,'reports'), snapshot=>{
-      snapshot.forEach(snap=>{
-        const data = snap.val();
-        if(!data.elephant) return;
-        const reportTime = new Date(data.time);
-        if((now-reportTime)/3600000>24) return;
-        const lat=data.lat,lng=data.lng;
-        const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/616/616408.png',iconSize:[25,25]})}).addTo(map);
-        const circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
-        reportMarkers.push(m); reportCircles.push(circle);
-        m.bindPopup(`<b>Elephant Sighting</b><br>District: ${data.district || ''}<br>Description: ${data.description || ''}<br>Number: ${data.numElephants || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
-      });
-    });
-  } else if(type==='accidents'){
-    onValue(ref(db,'accidents'), snapshot=>{
-      snapshot.forEach(snap=>{
-        const data = snap.val();
-        const reportTime = new Date(data.time);
-        if((now-reportTime)/3600000>24) return;
-        const lat=data.lat,lng=data.lng;
-        const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/565/565491.png',iconSize:[25,25]})}).addTo(map);
-        reportMarkers.push(m);
-        m.bindPopup(`<b>Elephant Accident</b><br>District: ${data.district || ''}<br>Description: ${data.description || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
-      });
-    });
-  }
+  let path = type==='sightings' ? 'reports' : 'accidents';
+  const snapshot = await get(ref(db,path));
+  if(!snapshot.exists()) return;
+
+  snapshot.forEach(snap=>{
+    const data = snap.val();
+    const reportTime = new Date(data.time);
+    if((now-reportTime)/3600000>24) return; // last 24 hours
+    const lat = data.lat;
+    const lng = data.lng;
+    let iconUrl = type==='sightings' 
+      ? 'https://cdn-icons-png.flaticon.com/512/616/616408.png' 
+      : 'https://cdn-icons-png.flaticon.com/512/565/565491.png';
+    let m = L.marker([lat,lng],{icon:L.icon({iconUrl:iconUrl,iconSize:[25,25]})}).addTo(map);
+    reportMarkers.push(m);
+    if(type==='sightings'){
+      let circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
+      reportCircles.push(circle);
+    }
+    let popupHtml = `<b>${type==='sightings'?'Elephant Sighting':'Elephant Accident'}</b><br>
+                     District: ${data.district||''}<br>
+                     Description: ${data.description||''}<br>
+                     Number: ${data.numElephants||''}<br>
+                     <button onclick="reportFalse('${snap.key}')">False information reported!</button>`;
+    m.bindPopup(popupHtml);
+  });
 }
 
 reportTypeSelect.addEventListener('change',loadReports);
@@ -117,7 +113,7 @@ document.getElementById('toggleMap').addEventListener('click',()=>{
   satellite=!satellite;
 });
 
-// User location with reverse geolocation
+// User location
 map.locate({setView:true,watch:true});
 map.on('locationfound', e=>{
   L.marker([e.latitude,e.longitude]).addTo(map).bindPopup("You are here").openPopup();
@@ -127,28 +123,25 @@ map.on('locationfound', e=>{
 document.getElementById('openSettings').addEventListener('click',()=>{document.getElementById('settingsPanel').style.display='block';});
 document.getElementById('closeSettings').addEventListener('click',()=>{
   document.getElementById('settingsPanel').style.display='none';
-  notifRadius=parseInt(notifRadiusInput.value);
+  notifRadius = parseInt(notifRadiusInput.value);
   localStorage.setItem('notifRadius',notifRadius);
   loadReports();
 });
 
-// Background notifications using Service Worker
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}
-</script>
-
-<script>
-// Service Worker for notifications
-const swCode = `
-self.addEventListener('install', e=>{self.skipWaiting();});
-self.addEventListener('activate', e=>{self.clients.claim();});
-self.addEventListener('push', e=>{
-  const data = e.data.json();
-  self.registration.showNotification(data.title,{body:data.body,icon:data.icon});
-});
-`;
-const blob = new Blob([swCode],{type:'application/javascript'});
-const url = URL.createObjectURL(blob);
-navigator.serviceWorker.register(url);
+// Background notifications
+if('serviceWorker' in navigator){
+  const swCode = `
+    self.addEventListener('install', e=>self.skipWaiting());
+    self.addEventListener('activate', e=>self.clients.claim());
+    self.addEventListener('push', e=>{
+      const data = e.data.json();
+      self.registration.showNotification(data.title,{body:data.body,icon:data.icon});
+    });
+  `;
+  const blob = new Blob([swCode],{type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url);
+}
 </script>
 </body>
 </html>
