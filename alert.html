@@ -1,65 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerts - Elephant Monitoring App</title>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-<style>
-body { background:#fafafa; font-family:Roboto, sans-serif; }
-.nav-wrapper { background:#2e7d32; }
-.container { margin-top:15px; }
-.card { border-radius:12px; }
-.report-img { width:80px; height:80px; object-fit:cover; border-radius:6px; cursor:pointer; }
-#map { height:300px; margin-top:15px; border-radius:12px; }
-.fixed-action-btn { bottom: 70px; right: 20px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elephant Alerts</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body { background:#f4f4f4; }
+    nav { background:#2e7d32; }
+    .card { border-radius:12px; margin-bottom:20px; }
+    .card-content img { width:100px; height:100px; object-fit:cover; border-radius:8px; cursor:pointer; margin:5px; }
+    .map-container { height:250px; margin-top:10px; border-radius:8px; }
+    .delete-btn { color:red; cursor:pointer; }
+  </style>
 </head>
 <body>
 
 <!-- Navbar -->
 <nav>
   <div class="nav-wrapper">
-    <a href="home.html" class="brand-logo center">Alerts</a>
+    <a href="home.html" class="brand-logo center">Elephant Alerts</a>
     <ul class="left">
       <li><a href="home.html"><i class="material-icons">home</i></a></li>
+    </ul>
+    <ul class="right">
+      <li><a href="#!" id="whyBtn">Why my report is not showing?</a></li>
     </ul>
   </div>
 </nav>
 
 <div class="container">
-  <!-- Filters -->
+  <!-- Filter -->
   <div class="input-field">
     <select id="filterSelect">
       <option value="all" selected>All Reports</option>
-      <option value="sighting">Sightings</option>
-      <option value="accident">Accidents</option>
+      <option value="sightings">Sightings</option>
+      <option value="accidents">Accidents</option>
     </select>
     <label>Filter Reports</label>
   </div>
 
-  <!-- Reports List -->
+  <!-- Reports -->
   <div id="reportsContainer"></div>
-
-  <!-- Map -->
-  <div id="map"></div>
 </div>
 
-<!-- Image Modal -->
-<div id="imgModal" class="modal">
-  <div class="modal-content">
-    <img id="modalImg" src="" style="width:100%;border-radius:12px;">
-  </div>
-</div>
-
-<!-- Confirm Delete Modal -->
+<!-- Delete Modal -->
 <div id="deleteModal" class="modal">
   <div class="modal-content">
     <h5>Confirm Delete</h5>
-    <p>Are you sure you want to delete this report?</p>
+    <div class="input-field">
+      <input id="agentIdInput" type="text">
+      <label for="agentIdInput">Enter Agent ID</label>
+    </div>
+    <div class="input-field">
+      <select id="deleteReasonSelect">
+        <option value="" disabled selected>Choose a reason</option>
+        <option value="Duplicate report">Duplicate report</option>
+        <option value="Inappropriate content">Inappropriate content</option>
+        <option value="False information">False information</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Reason for Deletion</label>
+    </div>
+    <div class="input-field" id="otherReasonField" style="display:none;">
+      <textarea id="deleteReasonOther" class="materialize-textarea"></textarea>
+      <label for="deleteReasonOther">Other Reason</label>
+    </div>
+    <label>
+      <input type="checkbox" id="agreementCheck"/>
+      <span>I confirm that I am authorized to delete this report.</span>
+    </label>
   </div>
   <div class="modal-footer">
     <a href="#!" id="confirmDelete" class="btn red">Delete</a>
@@ -67,150 +79,180 @@ body { background:#fafafa; font-family:Roboto, sans-serif; }
   </div>
 </div>
 
-<!-- Floating PDF Button -->
-<div class="fixed-action-btn">
-  <a class="btn-floating btn-large red" id="downloadPdf">
-    <i class="material-icons">picture_as_pdf</i>
-  </a>
+<!-- Deleted Report Info Modal -->
+<div id="deletedInfoModal" class="modal">
+  <div class="modal-content">
+    <h5>Deleted Report Information</h5>
+    <div id="deletedInfoContent"></div>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" id="acceptDelete" class="btn green">Accept</a>
+    <a href="#!" id="declineDelete" class="btn red">Decline</a>
+  </div>
 </div>
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, remove, set, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
   authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
   projectId: "elephant-monitoring-app-99ffd",
-  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
   messagingSenderId: "649960879930",
   appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-  measurementId: "G-GSQEVX635R",
   databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Materialize Init
-document.addEventListener("DOMContentLoaded", ()=>{
-  M.Modal.init(document.querySelectorAll(".modal"));
+// Init Materialize
+document.addEventListener("DOMContentLoaded",()=>{
   M.FormSelect.init(document.querySelectorAll("select"));
+  M.Modal.init(document.querySelectorAll(".modal"));
 });
 
-// Map Init
-const map = L.map("map").setView([7.8731, 80.7718], 7);
-L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-  attribution: "Esri &mdash; Source: Esri, i-cubed, USDA, USGS"
-}).addTo(map);
-
-let reportsData = {};
-let deleteId = null;
+let deleteTarget = null;
+let deleteReportData = null;
 
 // Load Reports
 async function loadReports(){
   const snap = await get(ref(db,"reports"));
-  if(snap.exists()){
-    reportsData = snap.val();
-    renderReports();
-  } else {
+  if(!snap.exists()){
     document.getElementById("reportsContainer").innerHTML="<p>No reports available.</p>";
+    return;
   }
+  const data = snap.val();
+  renderReports(data);
 }
 
-// Render Reports
-function renderReports(){
-  const container = document.getElementById("reportsContainer");
-  container.innerHTML = "";
-  const filter = document.getElementById("filterSelect").value;
+function renderReports(data){
+  const filter=document.getElementById("filterSelect").value;
+  const container=document.getElementById("reportsContainer");
+  container.innerHTML="";
 
-  map.eachLayer(l => { if(l instanceof L.Marker) map.removeLayer(l); });
+  Object.entries(data).forEach(([type,reports])=>{
+    if(filter!=="all" && type!==filter) return;
+    Object.entries(reports).forEach(([id,report])=>{
+      const card=document.createElement("div");
+      card.className="card";
+      card.innerHTML=`
+        <div class="card-content">
+          <span class="card-title">${type.toUpperCase()} Report</span>
+          <p><b>District:</b> ${report.district||"Unknown"}</p>
+          <p><b>Elephants:</b> ${report.numElephants||0}</p>
+          <p><b>Danger:</b> ${report.dangerLevel||"N/A"}</p>
+          <p><b>Description:</b> ${report.description||"N/A"}</p>
+          <p><b>Time:</b> ${report.time||"N/A"}</p>
+          <div class="map-container" id="map-${id}"></div>
+        </div>
+        <div class="card-action">
+          ${localStorage.getItem("agentId")?`<a href="#!" class="delete-btn" data-id="${id}" data-type="${type}">Delete</a>`:""}
+        </div>
+      `;
+      container.appendChild(card);
 
-  Object.entries(reportsData).forEach(([id,report])=>{
-    if(filter!=="all" && report.type!==filter) return;
+      if(report.lat && report.lng){
+        const map=L.map(`map-${id}`).setView([report.lat,report.lng],12);
+        L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}").addTo(map);
+        L.marker([report.lat,report.lng]).addTo(map).bindPopup(`${report.district||""}`);
+      }
 
-    // Report Card
-    const card = document.createElement("div");
-    card.className="card white";
-    card.innerHTML=`
-      <div class="card-content">
-        <span class="card-title">Elephant Report</span>
-        <p><b>District:</b> ${report.district||"Unknown"}</p>
-        <p><b>Elephants:</b> ${report.elephants||0}</p>
-        <p><b>Danger:</b> ${report.danger||"N/A"}</p>
-        <p><b>Incident:</b> ${report.incident||"N/A"}</p>
-        <p><b>Reporter:</b> ${report.reporter||"Anonymous"}</p>
-        ${report.image?`<img src="${report.image}" class="report-img" data-img="${report.image}">`:""}
-      </div>
-      <div class="card-action">
-        <a href="#!" class="red-text delete-btn" data-id="${id}">Delete</a>
-      </div>
-    `;
-    container.appendChild(card);
-
-    // Marker
-    if(report.lat && report.lng){
-      L.marker([report.lat,report.lng]).addTo(map)
-        .bindPopup(`<b>${report.district||"Unknown"}</b><br>${report.incident||""}`);
-    }
-  });
-
-  // Image Click
-  document.querySelectorAll(".report-img").forEach(img=>{
-    img.addEventListener("click",()=>{
-      document.getElementById("modalImg").src = img.dataset.img;
-      M.Modal.getInstance(document.getElementById("imgModal")).open();
-    });
-  });
-
-  // Delete Button
-  document.querySelectorAll(".delete-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      deleteId = btn.dataset.id;
-      M.Modal.getInstance(document.getElementById("deleteModal")).open();
+      const delBtn=card.querySelector(".delete-btn");
+      if(delBtn){
+        delBtn.addEventListener("click",()=>{
+          deleteTarget={id,type};
+          deleteReportData=report;
+          M.Modal.getInstance(document.getElementById("deleteModal")).open();
+        });
+      }
     });
   });
 }
 
 // Confirm Delete
+document.getElementById("deleteReasonSelect").addEventListener("change",e=>{
+  document.getElementById("otherReasonField").style.display=e.target.value==="Other"?"block":"none";
+});
+
 document.getElementById("confirmDelete").addEventListener("click",async()=>{
-  if(deleteId){
-    await remove(ref(db,"reports/"+deleteId));
-    deleteId = null;
+  const agentId=localStorage.getItem("agentId");
+  const inputId=document.getElementById("agentIdInput").value;
+  let reason=document.getElementById("deleteReasonSelect").value;
+  if(reason==="Other") reason=document.getElementById("deleteReasonOther").value;
+  const agree=document.getElementById("agreementCheck").checked;
+
+  if(!inputId || inputId!==agentId){ alert("Agent ID incorrect."); return; }
+  if(!reason.trim()){ alert("Please provide a reason."); return; }
+  if(!agree){ alert("You must confirm agreement."); return; }
+
+  if(deleteTarget && deleteReportData){
+    // Fetch agent info
+    const userSnap=await get(ref(db,"users/"+agentId));
+    const agentData=userSnap.exists()?userSnap.val():{name:"Unknown",mobile:"Unknown"};
+
+    await set(ref(db,"deletedReports/"+deleteTarget.id),{
+      ...deleteReportData,
+      deletedBy:agentId,
+      agentName:agentData.name,
+      agentMobile:agentData.mobile,
+      reason:reason,
+      timestamp:new Date().toISOString()
+    });
+
+    await remove(ref(db,`reports/${deleteTarget.type}/${deleteTarget.id}`));
+    deleteTarget=null; deleteReportData=null;
     M.Modal.getInstance(document.getElementById("deleteModal")).close();
     loadReports();
   }
 });
 
-// Filter Change
-document.getElementById("filterSelect").addEventListener("change",renderReports);
+// Why my report not showing
+document.getElementById("whyBtn").addEventListener("click",async()=>{
+  const emaId=localStorage.getItem("emaId");
+  if(!emaId){ alert("You must be logged in as a reporter."); return; }
 
-// Download PDF
-document.getElementById("downloadPdf").addEventListener("click",async()=>{
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF("p","pt","a4");
+  const snap=await get(ref(db,"deletedReports"));
+  if(!snap.exists()){ alert("No deleted reports found."); return; }
+  const data=snap.val();
 
-  // Capture reportsContainer + map
-  const reportsEl=document.getElementById("reportsContainer");
-  const mapEl=document.getElementById("map");
+  let found=null, foundId=null;
+  Object.entries(data).forEach(([id,rep])=>{
+    if(rep.userId===emaId && !found){ found=rep; foundId=id; }
+  });
 
-  const reportsCanvas=await html2canvas(reportsEl);
-  pdf.addImage(reportsCanvas.toDataURL("image/png"),"PNG",20,20,550,300);
+  if(found){
+    document.getElementById("deletedInfoContent").innerHTML=`
+      <p><b>Reason:</b> ${found.reason}</p>
+      <p><b>Agent:</b> ${found.agentName} (${found.agentMobile})</p>
+      <p><b>Time:</b> ${found.timestamp}</p>
+      <p><b>Description:</b> ${found.description}</p>
+    `;
+    M.Modal.getInstance(document.getElementById("deletedInfoModal")).open();
 
-  const mapCanvas=await html2canvas(mapEl);
-  pdf.addPage();
-  pdf.addImage(mapCanvas.toDataURL("image/png"),"PNG",20,20,550,300);
-
-  pdf.save("ElephantReports.pdf");
+    document.getElementById("acceptDelete").onclick=async()=>{
+      await remove(ref(db,"deletedReports/"+foundId));
+      M.Modal.getInstance(document.getElementById("deletedInfoModal")).close();
+    };
+    document.getElementById("declineDelete").onclick=async()=>{
+      alert("We're taking actions about it. It may take up-to 2 to 3 days. Stay Updated");
+      await set(ref(db,"deletedReports/"+foundId+"/actionNeeded"),true);
+      M.Modal.getInstance(document.getElementById("deletedInfoModal")).close();
+    };
+  }else{
+    alert("No deleted reports found for your account.");
+  }
 });
 
-// Load reports on start
+// Load
+document.getElementById("filterSelect").addEventListener("change",()=>loadReports());
 loadReports();
 </script>
 </body>
