@@ -7,7 +7,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, update, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, update, child, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -22,89 +22,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-window._fb = { db, ref, get, update, child };
+window._fb = { db, ref, get, update, child, onValue };
 </script>
 
 <style>
-body {
-  font-family: Roboto, sans-serif;
-  margin: 0;
-  background: #fafafa;
-}
-.container {
-  padding: 8px;
-  max-width: 420px;
-  margin: 0 auto;
-}
-.card-thin {
-  padding: 8px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  width: 100%;
-  box-sizing: border-box;
-}
-.profile-pic {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.stat-card {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 10px;
-  margin-bottom: 10px;
-}
-.stat-item {
-  text-align: center;
-  flex: 1 1 45%;
-  margin-bottom: 6px;
-}
-.stat-item h6 {
-  margin: 0;
-  font-weight: bold;
-}
-.action-btns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.fixed-btn {
-  position: fixed;
-  bottom: 16px;
-  right: 16px;
-  z-index: 1000;
-  transform: scale(0.9);
-}
-.ai-btn {
-  position: fixed;
-  bottom: 16px;
-  left: 16px;
-  background: #2e7d32;
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  z-index: 1000;
-  transform: scale(0.9);
-}
-.modal {
-  max-height: 85%;
-}
-input, select {
-  font-size: 0.9rem;
-}
-.btn, .btn-large, .btn-floating {
-  font-size: 0.85rem;
-  padding: 0 10px;
-}
+body { font-family: Roboto, sans-serif; margin: 0; background: #fafafa; }
+.container { padding: 8px; max-width: 420px; margin: 0 auto; }
+.card-thin { padding: 8px; border-radius: 10px; margin-bottom: 10px; cursor: pointer; }
+.profile-pic { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+.stat-card { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 8px 12px; border-radius: 10px; margin-bottom: 10px; }
+.stat-item { text-align: center; flex: 1 1 45%; margin-bottom: 6px; }
+.stat-item h6 { margin: 0; font-weight: bold; }
+.action-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.fixed-btn { position: fixed; bottom: 16px; right: 16px; z-index: 1000; }
+.ai-btn { position: fixed; bottom: 16px; left: 16px; background: #2e7d32; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; color: white; z-index: 1000; }
 </style>
 </head>
 <body>
@@ -123,22 +54,10 @@ input, select {
   </div>
 
   <div class="card white stat-card">
-    <div class="stat-item">
-      <h6 id="statElephants">0</h6>
-      <span>Elephants</span>
-    </div>
-    <div class="stat-item">
-      <h6 id="statReports">0</h6>
-      <span>Reports</span>
-    </div>
-    <div class="stat-item">
-      <h6 id="statDanger">0</h6>
-      <span>High Danger</span>
-    </div>
-    <div class="stat-item">
-      <h6 id="statDeaths">0</h6>
-      <span>Deaths</span>
-    </div>
+    <div class="stat-item"><h6 id="statElephants">0</h6><span>Elephants</span></div>
+    <div class="stat-item"><h6 id="statReports">0</h6><span>Reports</span></div>
+    <div class="stat-item"><h6 id="statDanger">0</h6><span>High Danger</span></div>
+    <div class="stat-item"><h6 id="statDeaths">0</h6><span>Deaths</span></div>
   </div>
 
   <div class="action-btns">
@@ -159,15 +78,9 @@ input, select {
     <div class="input-field"><input type="text" id="editName"><label for="editName">Name</label></div>
     <div class="input-field"><input type="email" id="editEmail"><label for="editEmail">Email</label></div>
     <div class="input-field"><input type="text" id="editMobile"><label for="editMobile">Mobile</label></div>
-    <div class="input-field">
-      <select id="editDistrict"></select>
-      <label>District</label>
-    </div>
+    <div class="input-field"><select id="editDistrict"></select><label>District</label></div>
     <div class="file-field input-field">
-      <div class="btn green">
-        <span>Profile Pic</span>
-        <input type="file" id="editPic">
-      </div>
+      <div class="btn green"><span>Profile Pic</span><input type="file" id="editPic"></div>
       <div class="file-path-wrapper"><input class="file-path validate" type="text"></div>
     </div>
     <div id="agentButtonContainer"></div>
@@ -184,10 +97,7 @@ input, select {
     <div class="input-field"><input type="text" id="agentName"><label>Name</label></div>
     <div class="input-field"><input type="text" id="agentNIC"><label>NIC</label></div>
     <div class="input-field"><input type="text" id="agentPhone"><label>Phone</label></div>
-    <div class="input-field">
-      <select id="agentDistrict"></select>
-      <label>District</label>
-    </div>
+    <div class="input-field"><select id="agentDistrict"></select><label>District</label></div>
   </div>
   <div class="modal-footer">
     <a href="#!" id="btnRegisterAgent" class="btn green">Register</a>
@@ -202,106 +112,77 @@ document.addEventListener("DOMContentLoaded",()=>{
   M.Modal.init(document.querySelectorAll('.modal'));
   M.FormSelect.init(document.querySelectorAll('select'));
 
-  const districts=[
-    "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"
-  ];
-  const districtSelect=document.getElementById("editDistrict");
-  const agentDistrictSelect=document.getElementById("agentDistrict");
-  districts.forEach(d=>{
-    let opt=document.createElement("option");
-    opt.value=d; opt.textContent=d;
-    districtSelect.appendChild(opt.cloneNode(true));
-    agentDistrictSelect.appendChild(opt);
-  });
-  M.FormSelect.init(document.querySelectorAll('select'));
-
-  const { db, ref, get, update, child } = window._fb;
-  function getCookie(name){
-    let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)");
-    return m?m.pop():"";
-  }
+  const { db, ref, get, update, child, onValue } = window._fb;
+  function getCookie(name){ let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)"); return m?m.pop():""; }
   const userId=getCookie("emaId");
   if(!userId){window.location.href="index.html";return;}
 
+  // Load profile
   get(child(ref(db),"users/"+userId)).then(snap=>{
     if(snap.exists()){
       const u=snap.val();
       document.getElementById("profilePic").src=u.picBase64||"";
       document.getElementById("profileName").textContent=u.name;
       document.getElementById("profileEmail").textContent=u.email;
+
       if(u.agentId){
         document.getElementById("agentStatus").textContent="Agent Status: Agent ("+u.agentId+")";
-        document.getElementById("agentButtonContainer").innerHTML='<a href="#!" id="btnUnregister" class="btn red">Unregister as Agent</a>';
+        localStorage.setItem("agentId", u.agentId);
+        document.cookie="agentId="+u.agentId+"; path=/";
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#!" id="btnUnregister" class="btn red">Unregister</a>';
         document.getElementById("btnUnregister").addEventListener("click",()=>{
-          update(ref(db,"users/"+userId),{agentId:null,agentInfo:null}).then(()=>location.reload());
+          update(ref(db,"users/"+userId),{agentId:null,agentInfo:null}).then(()=>{
+            localStorage.removeItem("agentId");
+            document.cookie="agentId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+            location.reload();
+          });
         });
       }else{
-        document.getElementById("agentButtonContainer").innerHTML='<a href="#agentModal" class="btn modal-trigger green">Want to be an Agent?</a>';
+        document.getElementById("agentButtonContainer").innerHTML='<a href="#agentModal" class="btn modal-trigger green">Become Agent</a>';
         M.Modal.init(document.querySelectorAll('.modal'));
       }
-      document.getElementById("editName").value=u.name;
-      document.getElementById("editEmail").value=u.email;
-      document.getElementById("editMobile").value=u.mobile;
-      document.getElementById("editDistrict").value=u.district;
-      M.updateTextFields();
-      M.FormSelect.init(document.querySelectorAll('select'));
+      document.getElementById("editName").value=u.name||"";
+      document.getElementById("editEmail").value=u.email||"";
+      document.getElementById("editMobile").value=u.mobile||"";
+      document.getElementById("editDistrict").value=u.district||"";
+      M.updateTextFields(); M.FormSelect.init(document.querySelectorAll('select'));
     }
-  });
-
-  document.getElementById("btnSaveProfile").addEventListener("click",async()=>{
-    const file=document.getElementById("editPic").files[0];
-    let updates={
-      name:document.getElementById("editName").value,
-      email:document.getElementById("editEmail").value,
-      mobile:document.getElementById("editMobile").value,
-      district:document.getElementById("editDistrict").value
-    };
-    if(file){
-      const reader=new FileReader();
-      reader.onload=async()=>{
-        updates.picBase64=reader.result;
-        await update(ref(db,"users/"+userId),updates);
-        location.reload();
-      };
-      reader.readAsDataURL(file);
-    }else{
-      await update(ref(db,"users/"+userId),updates);
-      location.reload();
-    }
-  });
-
-  document.getElementById("btnLogout").addEventListener("click",()=>{
-    document.cookie = "emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href="index.html";
   });
 
   document.getElementById("btnRegisterAgent").addEventListener("click",async()=>{
     const agentId="EA-"+Math.floor(1000+Math.random()*9000);
-    const info={
-      name:document.getElementById("agentName").value,
-      nic:document.getElementById("agentNIC").value,
-      phone:document.getElementById("agentPhone").value,
-      district:document.getElementById("agentDistrict").value
-    };
+    const info={name:document.getElementById("agentName").value,nic:document.getElementById("agentNIC").value,phone:document.getElementById("agentPhone").value,district:document.getElementById("agentDistrict").value};
     await update(ref(db,"users/"+userId),{agentId,agentInfo:info});
+    localStorage.setItem("agentId",agentId);
+    document.cookie="agentId="+agentId+"; path=/";
     location.reload();
   });
 
-  get(ref(db,"stats")).then(snap=>{
+  document.getElementById("btnLogout").addEventListener("click",()=>{
+    document.cookie="emaId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    document.cookie="agentId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    localStorage.clear(); sessionStorage.clear(); window.location.href="index.html";
+  });
+
+  // Live stats based on reports
+  onValue(ref(db,"reports"),snap=>{
     if(snap.exists()){
-      const s=snap.val();
-      document.getElementById("statElephants").textContent=s.elephants||0;
-      document.getElementById("statReports").textContent=s.reports||0;
-      document.getElementById("statDanger").textContent=s.danger||0;
-      document.getElementById("statDeaths").textContent=s.deaths||0;
+      let elephants=0,reports=0,danger=0,deaths=0;
+      snap.forEach(r=>{
+        reports++;
+        let data=r.val();
+        if(data.elephantCount) elephants+=parseInt(data.elephantCount);
+        if(data.danger==="High") danger++;
+        if(data.incidentType==="Death") deaths++;
+      });
+      document.getElementById("statElephants").textContent=elephants;
+      document.getElementById("statReports").textContent=reports;
+      document.getElementById("statDanger").textContent=danger;
+      document.getElementById("statDeaths").textContent=deaths;
     }
   });
 
-  document.getElementById("profileCard").addEventListener("click",()=>{
-    M.Modal.getInstance(document.getElementById("editProfileModal")).open();
-  });
+  document.getElementById("profileCard").addEventListener("click",()=>M.Modal.getInstance(document.getElementById("editProfileModal")).open());
 });
 </script>
 </body>
