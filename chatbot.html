@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 <style>
 body { font-family: 'Roboto', sans-serif; margin:0; background:#f0f2f5; display:flex; justify-content:center; align-items:center; height:100vh; }
-#chatContainer { width:100%; max-width:450px; background:#fff; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.2); display:flex; flex-direction:column; height:90vh; overflow:hidden; }
+#chatContainer { width:100%; max-width:500px; background:#fff; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.2); display:flex; flex-direction:column; height:90vh; overflow:hidden; }
 #chatWindow { flex:1; padding:10px; overflow-y:auto; }
 .message { max-width:80%; margin:5px 0; padding:10px 14px; border-radius:15px; word-wrap:break-word; }
 .user { background:#2e7d32; color:#fff; align-self:flex-end; border-bottom-right-radius:0; }
@@ -15,11 +15,14 @@ body { font-family: 'Roboto', sans-serif; margin:0; background:#f0f2f5; display:
 #chatInput { display:flex; border-top:1px solid #ccc; }
 #chatInput input { flex:1; padding:10px; border:none; outline:none; font-size:1rem; }
 #chatInput button { padding:10px 15px; border:none; background:#2e7d32; color:#fff; cursor:pointer; font-size:1rem; }
+#homeBtn { background:#1976d2; color:#fff; padding:10px; border:none; cursor:pointer; font-size:1rem; width:100%; text-align:center; }
+#homeBtn:hover { background:#1565c0; }
 @media(max-width:500px){ #chatContainer { height:95vh; } }
 </style>
 </head>
 <body>
 <div id="chatContainer">
+  <button id="homeBtn" onclick="window.location.href='home.html'">Home</button>
   <div id="chatWindow"></div>
   <div id="chatInput">
     <input type="text" id="userInput" placeholder="Type your message...">
@@ -32,27 +35,48 @@ const knowledgeBase = [
 { q: ["hi","hello","hey"], a:"Hello! I'm Ali, your guide to Sri Lanka wildlife and tourism." },
 { q: ["who created ema","creator of ema"], a:"EMA was created by Aveesha Ninsara Pelawaththa." },
 { q: ["what is ema","ema"], a:"EMA stands for Elephant Monitoring App, used to monitor elephants in Sri Lanka." },
-{ q: ["national parks","parks in sri lanka"], a:"Sri Lanka has parks like Yala, Wilpattu, Udawalawe, and Minneriya for wildlife." },
-{ q: ["elephant","elephants"], a:"Sri Lankan elephants are native to the island and often seen in national parks." },
-{ q: ["leopard","leopards"], a:"The Sri Lankan leopard is an endemic species, mostly found in Yala National Park." },
-{ q: ["mirissa","mirissa beach"], a:"Mirissa is a beautiful coastal town, famous for whale watching and beaches." },
-{ q: ["sigiriya","lion rock"], a:"Sigiriya is a UNESCO World Heritage site with an ancient rock fortress." },
-{ q: ["kandy","temple of the tooth"], a:"Kandy is famous for the Temple of the Tooth Relic and cultural festivals." },
-{ q: ["galle","fort galle"], a:"Galle Fort is a historic fort and a UNESCO World Heritage Site." },
-{ q: ["yala","yala national park"], a:"Yala National Park is ideal for spotting elephants and leopards." },
-{ q: ["udawalawe","udawalawe national park"], a:"Udawalawe National Park is famous for elephant herds and safaris." },
+{ q: ["national parks","parks in sri lanka"], a:"Sri Lanka has parks like Yala, Wilpattu, Udawalawe, Minneriya, Horton Plains, and Sinharaja Forest." },
+{ q: ["elephant","elephants"], a:"Sri Lankan elephants are native and often seen in national parks such as Udawalawe and Minneriya." },
+{ q: ["leopard","leopards"], a:"The Sri Lankan leopard is endemic, mostly found in Yala and Wilpattu National Parks." },
+{ q: ["sloth bear"], a:"The Sri Lankan sloth bear is an endangered species inhabiting forests and protected areas." },
+{ q: ["macaque","monkeys"], a:"Toque macaques and purple-faced langurs are common monkeys found in Sri Lanka's forests." },
+{ q: ["bird watching","birds"], a:"Sri Lanka has over 400 bird species, including endemic birds like the Sri Lanka blue magpie." },
+{ q: ["mirissa","mirissa beach"], a:"Mirissa is famous for whale watching, surfing, and beautiful beaches." },
+{ q: ["unawatuna","unawatuna beach"], a:"Unawatuna is a popular beach destination near Galle, ideal for swimming and snorkeling." },
+{ q: ["galle","fort galle"], a:"Galle Fort is a UNESCO World Heritage Site, rich in colonial history and culture." },
+{ q: ["kandy","temple of the tooth"], a:"Kandy is known for the Temple of the Tooth Relic and cultural festivals." },
+{ q: ["sigiriya","lion rock"], a:"Sigiriya is an ancient rock fortress and UNESCO World Heritage Site with stunning frescoes." },
+{ q: ["dambulla","cave temple"], a:"Dambulla Cave Temple has golden Buddha statues and ancient murals." },
+{ q: ["polonnaruwa"], a:"Polonnaruwa is a UNESCO World Heritage Site with ancient ruins and temples." },
+{ q: ["anuradhapura"], a:"Anuradhapura is an ancient city famous for Buddhist stupas and sacred sites." },
+{ q: ["yala","yala national park"], a:"Yala National Park is ideal for spotting elephants, leopards, and other wildlife." },
+{ q: ["udawalawe","udawalawe national park"], a:"Udawalawe National Park is famous for large elephant herds and safaris." },
 { q: ["minneriya","minneriya national park"], a:"Minneriya is known for the 'Gathering', where hundreds of elephants come together." },
-{ q: ["bird watching","birds"], a:"Sri Lanka has over 400 bird species, many endemic. Sinharaja Forest is ideal for birdwatching." },
-{ q: ["sinharaja","rainforest"], a:"Sinharaja Forest Reserve is a tropical rainforest and a UNESCO World Heritage Site." },
-{ q: ["eco tourism","sustainable tourism"], a:"Eco-tourism supports conservation and benefits local communities in Sri Lanka." },
-{ q: ["sri lanka","tourism"], a:"Sri Lanka offers rich biodiversity, cultural sites, beaches, and wildlife experiences." },
-{ q: ["beaches","coast"], a:"Sri Lanka has beautiful beaches like Mirissa, Unawatuna, Bentota, and Arugam Bay." },
+{ q: ["horton plains","world's end"], a:"Horton Plains is a highland plateau famous for World’s End cliff and trekking." },
+{ q: ["sinharaja","rainforest"], a:"Sinharaja Forest Reserve is a tropical rainforest and UNESCO World Heritage Site." },
+{ q: ["eco tourism","sustainable tourism"], a:"Eco-tourism promotes conservation and supports local communities." },
+{ q: ["turtle","turtles"], a:"Turtle conservation sites include Kosgoda, Rekawa, and Hikkaduwa on the southern coast." },
 { q: ["whale watching","whales"], a:"Mirissa and Trincomalee are popular spots for whale and dolphin watching." },
-{ q: ["turtle","turtles"], a:"Sri Lanka's southern coast has turtle conservation sites, including Kosgoda and Rekawa." },
-{ q: ["what can i do","activities"], a:"You can visit national parks, beaches, cultural sites, and enjoy eco-tourism activities." },
-{ q: ["food","sri lankan food"], a:"Try local dishes like rice and curry, hoppers, string hoppers, kottu, and seafood." },
+{ q: ["cultural sites","heritage"], a:"Sri Lanka has 8 UNESCO World Heritage Sites including Sigiriya, Galle Fort, and Kandy." },
+{ q: ["adventure","activities"], a:"Activities include safaris, trekking, surfing, whale watching, and bird watching." },
+{ q: ["tea plantations","nuwara eliya"], a:"Nuwara Eliya is famous for tea plantations, cool climate, and scenic landscapes." },
+{ q: ["ella","little adam's peak"], a:"Ella is known for Little Adam’s Peak, Nine Arch Bridge, and scenic train rides." },
+{ q: ["knuckles mountain","trekking"], a:"Knuckles Mountain Range offers trekking, waterfalls, and rich biodiversity." },
+{ q: ["nature","hiking"], a:"Sri Lanka has many trails in Horton Plains, Knuckles, and Adam’s Peak for hiking." },
+{ q: ["adam's peak","sri pada"], a:"Adam’s Peak is a pilgrimage site with sunrise trekking and a sacred footprint." },
+{ q: ["food","cuisine"], a:"Sri Lankan food includes rice and curry, hoppers, string hoppers, kottu, and seafood." },
 { q: ["thank you","thanks"], a:"You're welcome! I'm here to help with Sri Lanka wildlife, tourism, or EMA info." },
-{ q: ["bye","goodbye"], a:"Goodbye! Enjoy your Sri Lanka adventure!" }
+{ q: ["bye","goodbye"], a:"Goodbye! Enjoy your Sri Lanka adventure!" },
+{ q: ["hello ali"], a:"Hello! I'm Ali, your Sri Lanka wildlife and tourism guide." },
+{ q: ["what is sri lanka"], a:"Sri Lanka is an island nation in South Asia, rich in wildlife and culture." },
+{ q: ["eco tours","eco tour"], a:"Eco tours help you explore wildlife while supporting conservation and local communities." },
+{ q: ["mangroves"], a:"Sri Lanka's mangroves provide habitat for birds, crabs, and fish along the coast." },
+{ q: ["gem mining"], a:"Sri Lanka is famous for gemstones like sapphires, rubies, and moonstones." },
+{ q: ["festivals","new year"], a:"Sinhala and Tamil New Year is celebrated in April with traditional games and rituals." },
+{ q: ["ancient ruins"], a:"Polonnaruwa and Anuradhapura have well-preserved ruins and stupas." },
+{ q: ["cultural heritage"], a:"Sri Lanka has a rich heritage of Buddhism, Hinduism, colonial architecture, and traditions." },
+{ q: ["transport","getting around"], a:"Transport includes trains, buses, tuk-tuks, and rental cars." },
+{ q: ["trains","scenic trains"], a:"Train routes like Kandy to Ella offer breathtaking views of tea plantations and mountains." }
 ];
 
 const chatWindow = document.getElementById("chatWindow");
@@ -84,7 +108,7 @@ function sendMessage(){
   if(!text) return;
   appendMessage(text,"user");
   const reply = getReply(text);
-  setTimeout(()=> appendMessage(reply,"bot"), 500);
+  setTimeout(()=> appendMessage(reply,"bot"), 400);
   userInput.value = "";
 }
 
