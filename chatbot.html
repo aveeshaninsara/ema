@@ -3,92 +3,115 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ali AI - Sri Lanka Wildlife Chatbot</title>
+<title>Ali AI Chatbot</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
-  body { background:#f4f4f4; display:flex; flex-direction:column; height:100vh; margin:0; }
-  .chat-container { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; }
-  .chat-bubble { max-width:70%; margin:5px; padding:10px; border-radius:12px; word-wrap:break-word; }
-  .user { background:#2e7d32; color:white; align-self:flex-end; }
-  .ai { background:#e0e0e0; color:#000; align-self:flex-start; }
-  .input-container { display:flex; padding:10px; background:#fff; }
-  #userInput { flex:1; margin-right:10px; }
+  body { background: #f4f4f4; font-family: 'Roboto', sans-serif; }
+  .chat-container { max-width: 600px; margin: 50px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; flex-direction: column; height: 80vh; }
+  .chat-window { flex: 1; padding: 10px; overflow-y: auto; }
+  .chat-input { display: flex; border-top: 1px solid #ddd; }
+  .chat-input input { flex: 1; padding: 10px; border: none; outline: none; font-size: 1rem; }
+  .chat-input button { padding: 0 20px; background: #2e7d32; color: #fff; border: none; cursor: pointer; }
+  .bubble { padding: 10px 15px; margin: 5px 0; border-radius: 20px; max-width: 80%; display: inline-block; }
+  .bot { background: #e0f2f1; align-self: flex-start; }
+  .user { background: #2e7d32; color: #fff; align-self: flex-end; }
 </style>
 </head>
 <body>
 
-<div class="chat-container" id="chatContainer"></div>
-
-<div class="input-container">
-  <input type="text" id="userInput" placeholder="Ask Ali AI..." />
-  <button class="btn green" id="sendBtn">Send</button>
+<div class="chat-container">
+  <div id="chatWindow" class="chat-window"></div>
+  <div class="chat-input">
+    <input type="text" id="userInput" placeholder="Type your message..."/>
+    <button id="sendBtn">Send</button>
+  </div>
 </div>
 
 <script>
-const chatContainer = document.getElementById("chatContainer");
+const chatWindow = document.getElementById("chatWindow");
 const userInput = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
 
-// OpenRouter API key
-const API_KEY = "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";
+const API_KEY = "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";
 
-const systemMessage = {
-  role: "system",
-  content: `
-You are Ali AI. Only talk about Sri Lanka wildlife, eco-tourism, national parks, and conservation. 
-Always give short, clear answers. 
-If asked about EMA, respond: "Aveesha Ninsara Pelawaththa is the creator of EMA - Elephant Monitoring App."
-Politely refuse unrelated questions. 
-Fluent in Sinhala and Tamil.
-`
-};
+// Local knowledge base
+const knowledgeBase = [
+  { keywords: ["elephant"], answer: "Sri Lankan elephants are endangered and found in national parks." },
+  { keywords: ["yala"], answer: "Yala National Park is famous for elephants and leopards." },
+  { keywords: ["udawalawe"], answer: "Udawalawe National Park is ideal for elephant sightings." },
+  { keywords: ["ema"], answer: "EMA stands for Elephant Monitoring App, created by Aveesha Ninsara Pelawaththa." },
+];
 
-// Function to append messages
-function addMessage(text, sender) {
-  const div = document.createElement("div");
-  div.className = `chat-bubble ${sender}`;
-  div.textContent = text;
-  chatContainer.appendChild(div);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+// Strict message for unrelated topics
+const strictMsg = "Sorry, I can only answer about Sri Lanka wildlife, tourism, or EMA.";
+
+function appendMessage(msg, sender){
+  const bubble = document.createElement("div");
+  bubble.className = `bubble ${sender}`;
+  bubble.textContent = msg;
+  chatWindow.appendChild(bubble);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-// Send message
-async function sendMessage() {
-  const text = userInput.value.trim();
-  if (!text) return;
-  addMessage(text, "user");
-  userInput.value = "";
-
-  addMessage("Ali AI is typing...", "ai");
-  const typingBubble = chatContainer.lastChild;
-
+async function fetchOpenRouterReply(message){
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_KEY}`
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [systemMessage, { role: "user", content: text }],
-        temperature: 0.3,
-        max_tokens: 80
+        model: "sk-or-v1",
+        messages: [
+          { role: "system", content: "You are Ali AI. Answer only about Sri Lanka wildlife, tourism, and EMA. Keep responses short. If unrelated, respond: 'Sorry, I can only answer about Sri Lanka wildlife, tourism, or EMA.' Mention Aveesha Ninsara Pelawaththa if asked about the creator." },
+          { role: "user", content: message }
+        ],
+        temperature: 0.7
       })
     });
 
+    if(!response.ok){
+      console.error("OpenRouter API error:", response.status, await response.text());
+      return strictMsg;
+    }
+
     const data = await response.json();
-    const aiText = data.choices?.[0]?.message?.content?.trim() || "Sorry, I couldn’t understand.";
-    typingBubble.textContent = aiText;
-  } catch (err) {
-    typingBubble.textContent = "Error: Could not get response.";
-    console.error(err);
+    return data.choices[0].message.content.trim() || strictMsg;
+
+  } catch(err){
+    console.error("Fetch error:", err);
+    return strictMsg;
   }
 }
 
+async function getBotReply(message){
+  // Check local knowledge first
+  const lowerMsg = message.toLowerCase();
+  for(const item of knowledgeBase){
+    for(const kw of item.keywords){
+      if(lowerMsg.includes(kw.toLowerCase())){
+        return item.answer;
+      }
+    }
+  }
+
+  // Fetch OpenRouter AI reply
+  return await fetchOpenRouterReply(message);
+}
+
+async function sendMessage(){
+  const msg = userInput.value.trim();
+  if(!msg) return;
+  appendMessage(msg, "user");
+  userInput.value = "";
+
+  const reply = await getBotReply(msg);
+  appendMessage(reply, "bot");
+}
+
 sendBtn.addEventListener("click", sendMessage);
-userInput.addEventListener("keypress", e => { if (e.key === "Enter") sendMessage(); });
+userInput.addEventListener("keypress", e => { if(e.key === "Enter") sendMessage(); });
 </script>
 
 </body>
