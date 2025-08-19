@@ -5,11 +5,84 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alerts - Elephant Monitoring App</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+body { background:#fafafa; font-family:Roboto, sans-serif; }
+.nav-wrapper { background:#2e7d32; }
+.container { margin-top:15px; }
+.card { border-radius:12px; }
+.report-img { width:80px; height:80px; object-fit:cover; border-radius:6px; cursor:pointer; }
+#map { height:300px; margin-top:15px; border-radius:12px; }
+.fixed-action-btn { bottom: 70px; right: 20px; }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+  <div class="nav-wrapper">
+    <a href="home.html" class="brand-logo center">Alerts</a>
+    <ul class="left">
+      <li><a href="home.html"><i class="material-icons">home</i></a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- Filters -->
+  <div class="input-field">
+    <select id="filterSelect">
+      <option value="all" selected>All Reports</option>
+      <option value="sighting">Sightings</option>
+      <option value="accident">Accidents</option>
+    </select>
+    <label>Filter Reports</label>
+  </div>
+
+  <!-- Reports List -->
+  <div id="reportsContainer"></div>
+
+  <!-- Map -->
+  <div id="map"></div>
+</div>
+
+<!-- Image Modal -->
+<div id="imgModal" class="modal">
+  <div class="modal-content">
+    <img id="modalImg" src="" style="width:100%;border-radius:12px;">
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="deleteModal" class="modal">
+  <div class="modal-content">
+    <h5>Confirm Delete</h5>
+    <p>Are you sure you want to delete this report?</p>
+  </div>
+  <div class="modal-footer">
+    <a href="#!" id="confirmDelete" class="btn red">Delete</a>
+    <a href="#!" class="modal-close btn grey">Cancel</a>
+  </div>
+</div>
+
+<!-- Floating PDF Button -->
+<div class="fixed-action-btn">
+  <a class="btn-floating btn-large red" id="downloadPdf">
+    <i class="material-icons">picture_as_pdf</i>
+  </a>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -21,77 +94,124 @@ const firebaseConfig = {
   measurementId: "G-GSQEVX635R",
   databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-window._fb = { db, ref, onValue, remove };
-</script>
 
-<style>
-body { font-family: Roboto,sans-serif; background:#fafafa; margin:0; }
-.container { padding:10px; max-width:600px; margin:auto; }
-.card { margin-bottom:15px; border-radius:12px; }
-.card .card-content p { margin:5px 0; }
-.delete-btn { color:red; float:right; cursor:pointer; }
-</style>
-</head>
-<body>
-<div class="container">
-  <h5>Elephant Reports</h5>
-  <div id="reportsContainer"></div>
-</div>
+// Materialize Init
+document.addEventListener("DOMContentLoaded", ()=>{
+  M.Modal.init(document.querySelectorAll(".modal"));
+  M.FormSelect.init(document.querySelectorAll("select"));
+});
 
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+// Map Init
+const map = L.map("map").setView([7.8731, 80.7718], 7);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+  attribution: "Esri &mdash; Source: Esri, i-cubed, USDA, USGS"
+}).addTo(map);
 
-<script>
-document.addEventListener("DOMContentLoaded",()=>{
-  const { db, ref, onValue, remove } = window._fb;
-  function getCookie(name){ let m=document.cookie.match("(^|;)\\s*"+name+"\\s*=\\s*([^;]+)"); return m?m.pop():""; }
-  const agentId=getCookie("agentId")||localStorage.getItem("agentId");
-  const isAgent=!!agentId;
+let reportsData = {};
+let deleteId = null;
 
-  const reportsContainer=document.getElementById("reportsContainer");
+// Load Reports
+async function loadReports(){
+  const snap = await get(ref(db,"reports"));
+  if(snap.exists()){
+    reportsData = snap.val();
+    renderReports();
+  } else {
+    document.getElementById("reportsContainer").innerHTML="<p>No reports available.</p>";
+  }
+}
 
-  onValue(ref(db,"reports"),snap=>{
-    reportsContainer.innerHTML="";
-    if(snap.exists()){
-      snap.forEach(r=>{
-        const data=r.val(); const key=r.key;
-        const card=document.createElement("div");
-        card.className="card white";
-        card.innerHTML=`
-          <div class="card-content">
-            <span class="card-title">${data.district||"Unknown District"}
-              ${isAgent?`<i class="fa-solid fa-trash delete-btn" data-id="${key}" title="Delete"></i>`:""}
-            </span>
-            <p><b>Elephants:</b> ${data.elephantCount||0}</p>
-            <p><b>Danger:</b> ${data.danger||"N/A"}</p>
-            <p><b>Incident:</b> ${data.incidentType||"N/A"}</p>
-            <p><b>Reporter:</b> ${data.reporterName||"Anonymous"}</p>
-            ${data.image?`<img src="${data.image}" style="max-width:100%; border-radius:8px; margin-top:8px;">`:""}
-          </div>`;
-        reportsContainer.appendChild(card);
-      });
+// Render Reports
+function renderReports(){
+  const container = document.getElementById("reportsContainer");
+  container.innerHTML = "";
+  const filter = document.getElementById("filterSelect").value;
 
-      if(isAgent){
-        document.querySelectorAll(".delete-btn").forEach(btn=>{
-          btn.addEventListener("click",()=>{
-            const id=btn.getAttribute("data-id");
-            const entered=prompt("Enter your Agent ID to confirm delete:");
-            if(entered===agentId){
-              remove(ref(db,"reports/"+id));
-              M.toast({html:"Report deleted"});
-            }else{
-              M.toast({html:"Invalid Agent ID"});
-            }
-          });
-        });
-      }
-    }else{
-      reportsContainer.innerHTML="<p>No reports yet.</p>";
+  map.eachLayer(l => { if(l instanceof L.Marker) map.removeLayer(l); });
+
+  Object.entries(reportsData).forEach(([id,report])=>{
+    if(filter!=="all" && report.type!==filter) return;
+
+    // Report Card
+    const card = document.createElement("div");
+    card.className="card white";
+    card.innerHTML=`
+      <div class="card-content">
+        <span class="card-title">Elephant Report</span>
+        <p><b>District:</b> ${report.district||"Unknown"}</p>
+        <p><b>Elephants:</b> ${report.elephants||0}</p>
+        <p><b>Danger:</b> ${report.danger||"N/A"}</p>
+        <p><b>Incident:</b> ${report.incident||"N/A"}</p>
+        <p><b>Reporter:</b> ${report.reporter||"Anonymous"}</p>
+        ${report.image?`<img src="${report.image}" class="report-img" data-img="${report.image}">`:""}
+      </div>
+      <div class="card-action">
+        <a href="#!" class="red-text delete-btn" data-id="${id}">Delete</a>
+      </div>
+    `;
+    container.appendChild(card);
+
+    // Marker
+    if(report.lat && report.lng){
+      L.marker([report.lat,report.lng]).addTo(map)
+        .bindPopup(`<b>${report.district||"Unknown"}</b><br>${report.incident||""}`);
     }
   });
+
+  // Image Click
+  document.querySelectorAll(".report-img").forEach(img=>{
+    img.addEventListener("click",()=>{
+      document.getElementById("modalImg").src = img.dataset.img;
+      M.Modal.getInstance(document.getElementById("imgModal")).open();
+    });
+  });
+
+  // Delete Button
+  document.querySelectorAll(".delete-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      deleteId = btn.dataset.id;
+      M.Modal.getInstance(document.getElementById("deleteModal")).open();
+    });
+  });
+}
+
+// Confirm Delete
+document.getElementById("confirmDelete").addEventListener("click",async()=>{
+  if(deleteId){
+    await remove(ref(db,"reports/"+deleteId));
+    deleteId = null;
+    M.Modal.getInstance(document.getElementById("deleteModal")).close();
+    loadReports();
+  }
 });
+
+// Filter Change
+document.getElementById("filterSelect").addEventListener("change",renderReports);
+
+// Download PDF
+document.getElementById("downloadPdf").addEventListener("click",async()=>{
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF("p","pt","a4");
+
+  // Capture reportsContainer + map
+  const reportsEl=document.getElementById("reportsContainer");
+  const mapEl=document.getElementById("map");
+
+  const reportsCanvas=await html2canvas(reportsEl);
+  pdf.addImage(reportsCanvas.toDataURL("image/png"),"PNG",20,20,550,300);
+
+  const mapCanvas=await html2canvas(mapEl);
+  pdf.addPage();
+  pdf.addImage(mapCanvas.toDataURL("image/png"),"PNG",20,20,550,300);
+
+  pdf.save("ElephantReports.pdf");
+});
+
+// Load reports on start
+loadReports();
 </script>
 </body>
 </html>
