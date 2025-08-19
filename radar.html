@@ -4,48 +4,39 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EMA Radar</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
-#map { height:100%; width:100%; }
-#togglePanel, #settingsIcon { position:absolute; top:10px; left:10px; z-index:1000; }
-#settingsIcon { left:auto; right:10px; cursor:pointer; font-size:20px; background:white; padding:5px 8px; border-radius:5px; }
-#togglePanel select { padding:5px; font-size:14px; }
-#settingsPanel { position:absolute; top:50px; right:10px; background:white; padding:10px; border-radius:8px; z-index:1000; box-shadow:0 2px 6px rgba(0,0,0,0.3); display:none; }
-#settingsPanel label { display:block; margin-top:5px; font-size:14px; }
-#settingsPanel input { width: 100%; margin-top:2px; }
+html,body{margin:0;padding:0;height:100%;width:100%;font-family:sans-serif;}
+#map{height:100%;width:100%;}
+#controls{position:absolute;top:10px;left:10px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+#settingsPanel{position:absolute;top:10px;right:10px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;}
+button,select,input{margin:5px 0;padding:5px;}
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="togglePanel">
-  <label>Show:
-    <select id="reportType">
-      <option value="sightings">Sightings</option>
-      <option value="accidents">Accidents</option>
-    </select>
-  </label>
+
+<div id="controls">
+  <select id="reportType">
+    <option value="sightings">Sightings</option>
+    <option value="accidents">Accidents</option>
+  </select>
+  <button id="toggleMap">Satellite View</button>
+  <button id="openSettings">Settings</button>
 </div>
-<div id="settingsIcon">⚙️</div>
+
 <div id="settingsPanel">
-  <h4>Settings</h4>
-  <label>Notification Radius (meters):
-    <input type="number" id="notifRadius" value="500"/>
-  </label>
-  <label>Alert Distance (meters):
-    <input type="number" id="alertDistance" value="100"/>
-  </label>
-  <label>Enable Notifications:
-    <input type="checkbox" id="notifEnabled" checked/>
-  </label>
+  <label>Notification radius (meters)</label><br>
+  <input type="number" id="notifRadiusInput" value="500"><br>
+  <button id="closeSettings">Close Settings</button>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+// Firebase setup
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getDatabase, ref, onValue, set, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-<script>
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
   authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
@@ -57,117 +48,107 @@ const firebaseConfig = {
   measurementId: "G-GSQEVX635R"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-let map = L.map('map').setView([7.8731, 80.7718], 7);
-let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
-let layers = {"Terrain": terrainLayer, "Satellite": satelliteLayer};
-L.control.layers(layers).addTo(map);
+// Map setup
+let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
 
-let userMarker;
-let reportMarkers = [];
-let reportCircles = [];
-let notifRadius = 500;
-let alertDistance = 100;
-let notifEnabled = true;
+let map = L.map('map', {layers:[terrainLayer]}).setView([7.8731, 80.7718], 7);
 
-const reportTypeSelect = document.getElementById('reportType');
-const notifRadiusInput = document.getElementById('notifRadius');
-const alertDistanceInput = document.getElementById('alertDistance');
-const notifEnabledCheckbox = document.getElementById('notifEnabled');
-const settingsPanel = document.getElementById('settingsPanel');
-const settingsIcon = document.getElementById('settingsIcon');
+let reportMarkers=[], reportCircles=[];
+let reportTypeSelect = document.getElementById('reportType');
+let notifRadiusInput = document.getElementById('notifRadiusInput');
+let notifRadius = parseInt(localStorage.getItem('notifRadius')||500);
 
-settingsIcon.addEventListener('click', ()=>{ settingsPanel.style.display = settingsPanel.style.display==='none'?'block':'none'; });
-notifRadiusInput.addEventListener('change', ()=>{ notifRadius = parseInt(notifRadiusInput.value); });
-alertDistanceInput.addEventListener('change', ()=>{ alertDistance = parseInt(alertDistanceInput.value); });
-notifEnabledCheckbox.addEventListener('change', ()=>{ notifEnabled = notifEnabledCheckbox.checked; });
-reportTypeSelect.addEventListener('change', ()=>{ loadReports(); });
+function reportFalse(key){
+  const val = prompt("Reason for false report?");
+  if(val){
+    push(ref(db,'falseonmap'),{reportKey:key, reason:val, time:new Date().toLocaleString()});
+    alert("We'll take necessary actions. Stay updated.");
+  }
+}
 
-// Get current location
-navigator.geolocation.watchPosition(pos=>{
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
-  if(!userMarker){
-    userMarker = L.marker([lat,lng]).addTo(map).bindPopup("You are here").openPopup();
-  } else userMarker.setLatLng([lat,lng]);
-  checkPredictedZones(lat,lng);
-});
-
-// Load reports
 function loadReports(){
   reportMarkers.forEach(m=>map.removeLayer(m));
   reportCircles.forEach(c=>map.removeLayer(c));
   reportMarkers=[]; reportCircles=[];
   const type = reportTypeSelect.value;
-  db.ref('reports').once('value', snapshot=>{
-    const now = new Date();
-    snapshot.forEach(snap=>{
-      const data = snap.val();
-      const reportTime = new Date(data.time);
-      const diffHrs = (now - reportTime)/3600000;
-      if(diffHrs<=24){
-        const lat = data.lat;
-        const lng = data.lng;
-        if(type==='accidents' && data.accident){
-          const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/565/565491.png',iconSize:[25,25]})}).addTo(map);
-          m.bindPopup(`<b>Elephant Accident</b><br>District: ${data.district}<br>Description: ${data.description || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
-          reportMarkers.push(m);
-        } else if(type==='sightings' && data.elephant){
-          const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/616/616408.png',iconSize:[25,25]})}).addTo(map);
-          const circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
-          reportMarkers.push(m); reportCircles.push(circle);
-          m.bindPopup(`<b>Elephant Sighting</b><br>District: ${data.district}<br>Description: ${data.description || ''}<br>Number: ${data.numElephants || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
-        }
-      }
+  const now = new Date();
+
+  if(type==='sightings'){
+    onValue(ref(db,'reports'), snapshot=>{
+      snapshot.forEach(snap=>{
+        const data = snap.val();
+        if(!data.elephant) return;
+        const reportTime = new Date(data.time);
+        if((now-reportTime)/3600000>24) return;
+        const lat=data.lat,lng=data.lng;
+        const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/616/616408.png',iconSize:[25,25]})}).addTo(map);
+        const circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
+        reportMarkers.push(m); reportCircles.push(circle);
+        m.bindPopup(`<b>Elephant Sighting</b><br>District: ${data.district || ''}<br>Description: ${data.description || ''}<br>Number: ${data.numElephants || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
+      });
     });
-  });
+  } else if(type==='accidents'){
+    onValue(ref(db,'accidents'), snapshot=>{
+      snapshot.forEach(snap=>{
+        const data = snap.val();
+        const reportTime = new Date(data.time);
+        if((now-reportTime)/3600000>24) return;
+        const lat=data.lat,lng=data.lng;
+        const m = L.marker([lat,lng],{icon:L.icon({iconUrl:'https://cdn-icons-png.flaticon.com/512/565/565491.png',iconSize:[25,25]})}).addTo(map);
+        reportMarkers.push(m);
+        m.bindPopup(`<b>Elephant Accident</b><br>District: ${data.district || ''}<br>Description: ${data.description || ''}<br><button onclick="reportFalse('${snap.key}')">False information reported!</button>`);
+      });
+    });
+  }
 }
 
-function reportFalse(key){
-  db.ref('falseonmap').push({report:key,time:new Date().toString()});
-  alert('We will take necessary actions. Stay updated.');
-}
-
-// Check predicted zones
-function checkPredictedZones(userLat,userLng){
-  if(!notifEnabled) return;
-  reportCircles.forEach(circle=>{
-    const center = circle.getLatLng();
-    const distance = map.distance([userLat,userLng],[center.lat,center.lng]);
-    if(distance <= notifRadius){
-      if("Notification" in window && Notification.permission==="granted"){
-        navigator.serviceWorker.ready.then(registration=>{
-          registration.showNotification("EMA Alert","You're in an elephant sighting range. Proceed with caution.");
-        });
-      }
-    }
-  });
-}
-
-// Initial load
+reportTypeSelect.addEventListener('change',loadReports);
 loadReports();
 
-// Request notification permission
-if("Notification" in window){
-  Notification.requestPermission();
-}
+// Map toggle
+let satellite=false;
+document.getElementById('toggleMap').addEventListener('click',()=>{
+  if(satellite){map.removeLayer(satelliteLayer);terrainLayer.addTo(map);document.getElementById('toggleMap').textContent='Satellite View';}
+  else{map.removeLayer(terrainLayer);satelliteLayer.addTo(map);document.getElementById('toggleMap').textContent='Normal View';}
+  satellite=!satellite;
+});
 
-// Register Service Worker
-if('serviceWorker' in navigator){
-  const swCode = `
-  self.addEventListener('install', e => { self.skipWaiting(); });
-  self.addEventListener('activate', e => { self.clients.claim(); });
-  self.addEventListener('push', e => { 
-    const data = e.data.json(); 
-    self.registration.showNotification(data.title, {body:data.body,icon:data.icon||''});
-  });
-  `;
-  const blob = new Blob([swCode],{type:'application/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(blob));
-}
+// User location with reverse geolocation
+map.locate({setView:true,watch:true});
+map.on('locationfound', e=>{
+  L.marker([e.latitude,e.longitude]).addTo(map).bindPopup("You are here").openPopup();
+});
+
+// Settings panel
+document.getElementById('openSettings').addEventListener('click',()=>{document.getElementById('settingsPanel').style.display='block';});
+document.getElementById('closeSettings').addEventListener('click',()=>{
+  document.getElementById('settingsPanel').style.display='none';
+  notifRadius=parseInt(notifRadiusInput.value);
+  localStorage.setItem('notifRadius',notifRadius);
+  loadReports();
+});
+
+// Background notifications using Service Worker
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}
+</script>
+
+<script>
+// Service Worker for notifications
+const swCode = `
+self.addEventListener('install', e=>{self.skipWaiting();});
+self.addEventListener('activate', e=>{self.clients.claim();});
+self.addEventListener('push', e=>{
+  const data = e.data.json();
+  self.registration.showNotification(data.title,{body:data.body,icon:data.icon});
+});
+`;
+const blob = new Blob([swCode],{type:'application/javascript'});
+const url = URL.createObjectURL(blob);
+navigator.serviceWorker.register(url);
 </script>
 </body>
 </html>
