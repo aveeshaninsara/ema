@@ -35,13 +35,21 @@
 
 <div class="container">
   <!-- Filter -->
-  <div class="input-field">
-    <select id="filterSelect">
-      <option value="all" selected>All Reports</option>
-      <option value="sightings">Sightings</option>
-      <option value="accidents">Accidents</option>
-    </select>
-    <label>Filter Reports</label>
+  <div class="row">
+    <div class="input-field col s6">
+      <select id="filterSelect">
+        <option value="all" selected>All Reports</option>
+        <option value="sightings">Sightings</option>
+        <option value="accidents">Accidents</option>
+      </select>
+      <label>Filter by Type</label>
+    </div>
+    <div class="input-field col s6">
+      <select id="districtSelect">
+        <option value="all" selected>All Districts</option>
+      </select>
+      <label>Filter by District</label>
+    </div>
   </div>
 
   <!-- Reports -->
@@ -52,6 +60,7 @@
 <div id="deleteModal" class="modal">
   <div class="modal-content">
     <h5>Confirm Delete</h5>
+    <p>Are you sure you want to delete this report?</p>
     <div class="input-field">
       <input id="agentIdInput" type="text">
       <label for="agentIdInput">Enter Agent ID</label>
@@ -143,12 +152,12 @@ document.addEventListener("DOMContentLoaded",()=>{
   M.Modal.init(document.querySelectorAll(".modal"));
 });
 
-let deleteTarget = null;
-let deleteReportData = null;
+let deleteTarget=null;
+let deleteReportData=null;
 
 // Load Reports
 async function loadReports(){
-  const snap = await get(ref(db,"reports"));
+  const snap=await get(ref(db,"reports"));
   if(!snap.exists()){
     document.getElementById("reportsContainer").innerHTML="<p>No reports available.</p>";
     return;
@@ -157,22 +166,37 @@ async function loadReports(){
 }
 
 function renderReports(data){
-  const filter=document.getElementById("filterSelect").value;
+  const filterType=document.getElementById("filterSelect").value;
+  const filterDistrict=document.getElementById("districtSelect").value;
   const container=document.getElementById("reportsContainer");
   container.innerHTML="";
 
+  let districts=new Set(["all"]);
+
   Object.entries(data).forEach(([type,reports])=>{
-    if(filter!=="all" && type!==filter) return;
+    if(filterType!=="all" && type!==filterType) return;
     Object.entries(reports).forEach(([id,report])=>{
+      if(filterDistrict!=="all" && report.district!==filterDistrict) return;
+
+      districts.add(report.district||"Unknown");
+
       const card=document.createElement("div");
       card.className="card";
       card.innerHTML=`
         <div class="card-content">
           <span class="card-title">${type.toUpperCase()} Report</span>
           <p><b>District:</b> ${report.district||"Unknown"}</p>
-          <p><b>Elephants:</b> ${report.numElephants||0}</p>
-          <p><b>Danger:</b> ${report.dangerLevel||"N/A"}</p>
-          <p><b>Description:</b> ${report.description||"N/A"}</p>
+          ${type==="accidents" ? `
+            <p><b>Elephant:</b> ${report.elephant?"Yes":"No"}</p>
+            <p><b>Human:</b> ${report.human?"Yes":"No"}</p>
+            <p><b>Critical:</b> ${report.critical?"Yes":"No"}</p>
+            <p><b>Elephant Type:</b> ${report.eleType||"Unknown"}</p>
+            <p><b>Group/Single:</b> ${report.singleOrGroup||"Unknown"}</p>
+          ` : `
+            <p><b>Elephants:</b> ${report.numElephants||0}</p>
+            <p><b>Danger:</b> ${report.dangerLevel||"N/A"}</p>
+            <p><b>Description:</b> ${report.description||"N/A"}</p>
+          `}
           <p><b>Time:</b> ${report.time||"N/A"}</p>
         </div>
         <div class="card-action action-buttons">
@@ -184,7 +208,7 @@ function renderReports(data){
       `;
       container.appendChild(card);
 
-      // Delete button handler
+      // Delete button
       const delBtn=card.querySelector(".delete-btn");
       if(delBtn){
         delBtn.addEventListener("click",()=>{
@@ -194,7 +218,7 @@ function renderReports(data){
         });
       }
 
-      // Map button handler
+      // Map button
       card.querySelector(".map-btn").addEventListener("click",(e)=>{
         const lat=e.target.getAttribute("data-lat");
         const lng=e.target.getAttribute("data-lng");
@@ -202,13 +226,14 @@ function renderReports(data){
         const mapModal=document.getElementById("mapModal");
         M.Modal.getInstance(mapModal).open();
         setTimeout(()=>{
+          document.getElementById("mapPopup").innerHTML=""; // reset
           const map=L.map("mapPopup").setView([lat,lng],12);
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
           L.marker([lat,lng]).addTo(map).bindPopup(district).openPopup();
         },200);
       });
 
-      // Image button handler
+      // Image button
       card.querySelector(".image-btn").addEventListener("click",(e)=>{
         const imgs=JSON.parse(e.target.getAttribute("data-images"));
         const container=document.getElementById("imagesContainer");
@@ -221,21 +246,38 @@ function renderReports(data){
         M.Modal.getInstance(document.getElementById("imagesModal")).open();
       });
 
-      // PDF button handler
+      // PDF button
       card.querySelector(".pdf-btn").addEventListener("click",(e)=>{
         const { jsPDF } = window.jspdf;
         const doc=new jsPDF();
         const report=JSON.parse(e.target.getAttribute("data-report"));
         doc.text("Elephant Report",20,20);
         doc.text(`District: ${report.district}`,20,30);
-        doc.text(`Elephants: ${report.numElephants}`,20,40);
-        doc.text(`Danger: ${report.dangerLevel}`,20,50);
-        doc.text(`Description: ${report.description}`,20,60);
-        doc.text(`Time: ${report.time}`,20,70);
+        if(type==="accidents"){
+          doc.text(`Elephant: ${report.elephant?"Yes":"No"}`,20,40);
+          doc.text(`Human: ${report.human?"Yes":"No"}`,20,50);
+          doc.text(`Critical: ${report.critical?"Yes":"No"}`,20,60);
+          doc.text(`Elephant Type: ${report.eleType}`,20,70);
+        }else{
+          doc.text(`Elephants: ${report.numElephants}`,20,40);
+          doc.text(`Danger: ${report.dangerLevel}`,20,50);
+          doc.text(`Description: ${report.description}`,20,60);
+        }
+        doc.text(`Time: ${report.time}`,20,80);
         doc.save("report.pdf");
       });
     });
   });
+
+  // Update district dropdown
+  const districtSelect=document.getElementById("districtSelect");
+  districtSelect.innerHTML="";
+  districts.forEach(d=>{
+    const opt=document.createElement("option");
+    opt.value=d; opt.textContent=d;
+    districtSelect.appendChild(opt);
+  });
+  M.FormSelect.init(districtSelect);
 }
 
 // Delete confirm
@@ -308,6 +350,8 @@ document.getElementById("whyBtn").addEventListener("click",async()=>{
 });
 
 document.getElementById("filterSelect").addEventListener("change",()=>loadReports());
+document.getElementById("districtSelect").addEventListener("change",()=>loadReports());
+
 loadReports();
 </script>
 </body>
