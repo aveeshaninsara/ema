@@ -1,79 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerts - Elephant Monitoring App</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Alerts — Elephant Monitoring App</title>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+
 <style>
-body { font-family: Roboto, sans-serif; background:#f5f5f5; margin:0; padding:0; }
-.container { max-width:500px; margin:auto; padding:10px; }
-.card { margin:10px 0; border-radius:12px; }
-.card-content { padding:12px; }
-.card-title { font-weight:bold; }
-.card-actions { display:flex; justify-content:flex-end; gap:10px; }
-.icon-btn { cursor:pointer; font-size:1.2em; }
-.icon-btn.delete { color:red; }
-.fixed-buttons { display:flex; justify-content:space-between; margin:10px 0; }
-select { display:inline-block; width:48%; }
-.modal { max-height:90%; }
-#mapPopup { height:300px; width:100%; }
-.image-container img { width:80px; height:80px; margin:4px; cursor:pointer; object-fit:cover; border-radius:6px; }
+  :root{--green:#2e7d32}
+  body{font-family:Roboto,Arial,sans-serif;background:#f6f7f9;margin:0}
+  nav{background:var(--green)}
+  .container{max-width:700px;margin:12px auto;padding:0 12px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+  .controls select{min-width:160px}
+  .controls .btn{height:44px;line-height:44px}
+  .card{border-radius:12px;margin:10px 0;box-shadow:0 6px 18px rgba(0,0,0,.06);overflow:hidden}
+  .card .card-content{padding:12px}
+  .card-title{font-weight:600;margin-bottom:6px}
+  .meta{color:#555;font-size:0.95rem;margin-bottom:6px}
+  .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .thumbs img{width:72px;height:56px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid #eee}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+  .icon-btn{cursor:pointer;font-size:1.1rem;color:var(--green)}
+  .icon-btn.delete{color:#c62828}
+  .modal{max-height:90%}
+  #mapPopup{height:320px;width:100%}
+  @media (max-width:420px){ .controls{flex-direction:column;align-items:stretch} .controls select{width:100%} }
 </style>
 </head>
 <body>
+<nav><div class="nav-wrapper"><a class="brand-logo center" style="padding-left:8px">EMA Alerts</a></div></nav>
+
 <div class="container">
-  <div class="fixed-buttons">
-    <a id="btnHome" class="btn green">Home</a>
-    <a id="btnWhy" class="btn blue">Why is my report not showing?</a>
-  </div>
-  <div class="fixed-buttons">
-    <select id="typeFilter">
-      <option value="sightings">Sightings</option>
+  <div class="controls">
+    <select id="typeSelect">
+      <option value="sightings" selected>Sightings</option>
       <option value="accidents">Accidents</option>
     </select>
-    <select id="districtFilter">
+
+    <select id="districtSelect">
       <option value="">All Districts</option>
+      <option>Ampara</option><option>Anuradhapura</option><option>Badulla</option><option>Batticaloa</option>
+      <option>Colombo</option><option>Galle</option><option>Gampaha</option><option>Hambantota</option>
+      <option>Jaffna</option><option>Kalutara</option><option>Kandy</option><option>Kegalle</option>
+      <option>Kilinochchi</option><option>Kurunegala</option><option>Mannar</option><option>Matale</option>
+      <option>Matara</option><option>Monaragala</option><option>Mullaitivu</option><option>Nuwara Eliya</option>
+      <option>Polonnaruwa</option><option>Puttalam</option><option>Ratnapura</option><option>Trincomalee</option>
+      <option>Vavuniya</option>
     </select>
+
+    <a id="btnWhy" class="btn orange">Why my report not showing?</a>
+    <a id="btnHome" class="btn green">Home</a>
   </div>
-  <div id="reportContainer"></div>
+
+  <div id="reportList"></div>
 </div>
 
-<div id="deletedReportsModal" class="modal">
+<!-- Images modal -->
+<div id="imagesModal" class="modal">
   <div class="modal-content">
-    <h5>Deleted Reports</h5>
-    <div id="deletedContainer"></div>
+    <h5>Images</h5>
+    <div id="imagesContainer" style="display:flex;flex-wrap:wrap;gap:8px"></div>
   </div>
-  <div class="modal-footer">
-    <a href="#!" class="modal-close btn red">Close</a>
-  </div>
+  <div class="modal-footer"><a href="#!" class="modal-close btn red">Close</a></div>
 </div>
 
+<!-- Map modal -->
 <div id="mapModal" class="modal">
   <div class="modal-content">
-    <h5>Report Location</h5>
+    <h5>Location</h5>
     <div id="mapPopup"></div>
   </div>
   <div class="modal-footer">
+    <a id="btnCapturePdfMap" class="btn orange">Include map in PDF</a>
     <a href="#!" class="modal-close btn red">Close</a>
   </div>
 </div>
 
-<div id="imageModal" class="modal">
+<!-- Delete modal -->
+<div id="deleteModal" class="modal">
   <div class="modal-content">
-    <h5>Images</h5>
-    <div class="image-container" id="imageContainer"></div>
+    <h5>Delete report</h5>
+    <p>Agent ID:</p>
+    <div class="input-field"><input id="agentIdInput" type="text"><label for="agentIdInput">Agent ID</label></div>
+    <p>Reason for deletion</p>
+    <div class="input-field">
+      <select id="deleteReason">
+        <option value="" disabled selected>Choose reason</option>
+        <option value="Fake report">Fake report</option>
+        <option value="Miscontent">Miscontent</option>
+        <option value="Fraud information">Fraud information</option>
+        <option value="Description is fake">Description is fake</option>
+        <option value="Duplicate report">Duplicate report</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Reason</label>
+    </div>
+    <p>
+      <label><input type="checkbox" id="deleteAgree"/><span> I agree this information is correct and I will not harass anyone</span></label>
+    </p>
   </div>
   <div class="modal-footer">
-    <a href="#!" class="modal-close btn red">Close</a>
+    <a id="confirmDeleteBtn" class="btn red">Delete</a>
+    <a href="#!" class="modal-close btn-flat">Cancel</a>
   </div>
 </div>
+
+<!-- Deleted reports modal -->
+<div id="deletedModal" class="modal">
+  <div class="modal-content">
+    <h5>Deleted Reports</h5>
+    <div id="deletedList"></div>
+  </div>
+  <div class="modal-footer"><a href="#!" class="modal-close btn red">Close</a></div>
+</div>
+
+<!-- libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, get, set, remove, child, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
@@ -85,137 +138,379 @@ const firebaseConfig = {
   appId: "1:649960879930:web:d6f703cea9029a2fd14203",
   measurementId: "G-GSQEVX635R"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-document.addEventListener("DOMContentLoaded", async ()=>{
-  const districts = ["Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota","Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale","Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura","Trincomalee","Vavuniya"];
-  const districtFilter = document.getElementById("districtFilter");
-  districts.forEach(d=>{ let o=document.createElement("option"); o.value=d;o.textContent=d; districtFilter.appendChild(o); });
+document.addEventListener("DOMContentLoaded", async () => {
   M.FormSelect.init(document.querySelectorAll('select'));
   M.Modal.init(document.querySelectorAll('.modal'));
 
-  const userId = "EMA-42DNDC"; 
-  const userSnap = await get(ref(db,"users/"+userId));
-  const user = userSnap.exists()? userSnap.val() : {role:"user",name:"Unknown",password:"",district:""};
-  const isAgent = user.role && user.role.toLowerCase()==="agent";
-  const userDistrict = user.district;
+  function getCookie(name){
+    const v = `; ${document.cookie}`;
+    const parts = v.split(`; ${name}=`);
+    if(parts.length===2) return parts.pop().split(';').shift();
+    return "";
+  }
 
-  let currentType = document.getElementById("typeFilter").value;
-  let currentDistrict = "";
+  const emaCookieNames = ["emaId","userId","emaid"]; // try common names
+  let userId = "";
+  for(const n of emaCookieNames){ const c = getCookie(n); if(c){ userId = c; break; } }
+  if(!userId) userId = getCookie("emaId") || getCookie("userId") || "";
+
+  if(!userId){
+    // no cookie: redirect to login
+    window.location.href = "index.html";
+    return;
+  }
+
+  // check agent registration: look under users/<userId>/agent
+  const agentSnap = await get(child(ref(db), `users/${userId}/agent`));
+  let isAgent = false;
+  let agentInfo = null;
+  if(agentSnap.exists()){
+    agentInfo = agentSnap.val();
+    if(agentInfo && (agentInfo.agentId || agentInfo.id)) {
+      isAgent = true;
+      agentInfo.agentId = agentInfo.agentId || agentInfo.id || "";
+      agentInfo.district = agentInfo.district || "";
+      agentInfo.name = agentInfo.name || "";
+      agentInfo.mobile = agentInfo.mobile || "";
+    }
+  }
+
+  const typeSelect = document.getElementById("typeSelect");
+  const districtSelect = document.getElementById("districtSelect");
+  const reportList = document.getElementById("reportList");
+  const imagesModal = M.Modal.getInstance(document.getElementById("imagesModal"));
+  const mapModal = M.Modal.getInstance(document.getElementById("mapModal"));
+  const deleteModal = M.Modal.getInstance(document.getElementById("deleteModal"));
+  const deletedModal = M.Modal.getInstance(document.getElementById("deletedModal"));
+
+  let currentType = typeSelect.value;
+  let currentDistrict = districtSelect.value || "";
+
+  typeSelect.addEventListener("change", async (e)=>{ currentType = e.target.value; await loadReports(); });
+  districtSelect.addEventListener("change", async (e)=>{ currentDistrict = e.target.value; await loadReports(); });
 
   async function loadReports(){
-    const container = document.getElementById("reportContainer");
-    container.innerHTML="";
-    const snapshot = await get(ref(db,"reports/"+currentType));
-    if(snapshot.exists()){
-      const now = new Date().getTime();
-      snapshot.forEach(snap=>{
-        const report = snap.val();
-        const key = snap.key;
-        const reportTime = new Date(report.time).getTime();
-        if(now-reportTime>24*3600*1000) return;
-        if(currentDistrict && report.district!==currentDistrict) return;
-        let deleteBtnHTML="";
-        if(isAgent) deleteBtnHTML=`<i class="fas fa-trash icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${report.userId}" data-district="${report.district}"></i>`;
-        let html=`<div class="card">
-          <div class="card-content">
-            <span class="card-title">${report.description}</span>
-            <p><b>Reporter:</b> ${report.userName} | <b>Mobile:</b> <span class="reporterMobile" data-num="${report.userMobile}">${report.userMobile}</span></p>
-            <p><b>District:</b> ${report.district} | <b>Elephants:</b> ${report.numElephants} | <b>Danger:</b> ${report.dangerLevel}</p>
-            <div class="card-actions">
-              <i class="fas fa-map icon-btn map" data-lat="${report.lat}" data-lng="${report.lng}"></i>
-              <i class="fas fa-image icon-btn images" data-images='${JSON.stringify(report.images||[])}'></i>
-              ${deleteBtnHTML}
-            </div>
+    reportList.innerHTML = '<p style="padding:12px">Loading...</p>';
+    const snap = await get(ref(db, `reports/${currentType}`));
+    reportList.innerHTML = "";
+    if(!snap.exists()) { reportList.innerHTML = '<p style="padding:12px">No reports.</p>'; return; }
+
+    // iterate all reports (object or snapshot)
+    const now = Date.now();
+    snap.forEach(childSnap=>{
+      const key = childSnap.key;
+      const r = childSnap.val();
+      const t = new Date(r.time).getTime();
+      if(isNaN(t)) return;
+      if(now - t > 24*3600*1000) return; // older than 24h
+      if(currentDistrict && r.district !== currentDistrict) return;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      const images = Array.isArray(r.images) ? r.images : (r.images? Object.values(r.images): []);
+      const thumbsHtml = images.map(src => `<img src="${escapeHtml(src)}" data-src="${escapeHtml(src)}">`).join("");
+      const deleteHtml = isAgent ? `<i class="fa-solid fa-trash icon-btn delete" data-key="${key}" data-type="${currentType}" data-userid="${r.userId||""}" data-district="${r.district||""}" title="Delete"></i>` : "";
+
+      card.innerHTML = `
+        <div class="card-content">
+          <div class="card-title">${escapeHtml(r.description||"No description")}</div>
+          <div class="meta">Reporter: ${escapeHtml(r.userName||"Unknown")} • <a href="tel:${escapeAttr(r.userMobile||"")}">${escapeHtml(r.userMobile||"N/A")}</a></div>
+          <div class="meta">District: ${escapeHtml(r.district||"")} • Elephants: ${escapeHtml(String(r.numElephants||"0"))} • Danger: ${escapeHtml(r.dangerLevel||"")}</div>
+          <div class="meta">Time: ${escapeHtml(r.time||"")}</div>
+          <div class="thumbs">${thumbsHtml}</div>
+          <div class="actions">
+            <i class="fa-solid fa-location-dot icon-btn map" data-lat="${r.lat||0}" data-lng="${r.lng||0}" title="Open map"></i>
+            <i class="fa-regular fa-image icon-btn view-images" title="View images"></i>
+            <i class="fa-solid fa-file-pdf icon-btn pdf" title="Download PDF"></i>
+            ${deleteHtml}
           </div>
         </div>`;
-        container.innerHTML+=html;
-      });
-      attachEvents();
-    }
+      reportList.appendChild(card);
+    });
+
+    attachHandlers();
   }
 
-  function attachEvents(){
-    document.querySelectorAll(".map").forEach(m=>{
-      m.onclick=()=>{
-        const lat=parseFloat(m.dataset.lat), lng=parseFloat(m.dataset.lng);
-        const mapModal=M.Modal.getInstance(document.getElementById("mapModal"));
-        mapModal.open();
-        const mapDiv = document.getElementById("mapPopup");
-        mapDiv.innerHTML="";
-        const map = L.map(mapDiv).setView([lat,lng],10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
-        L.marker([lat,lng]).addTo(map);
+  function attachHandlers(){
+    // thumbnails click -> images modal
+    document.querySelectorAll(".thumbs img").forEach(img=>{
+      img.onclick = () => {
+        const src = img.dataset.src;
+        showImages([src]);
       };
     });
-    document.querySelectorAll(".images").forEach(i=>{
-      i.onclick=()=>{
-        const imgs = JSON.parse(i.dataset.images||"[]");
-        const imgModal = M.Modal.getInstance(document.getElementById("imageModal"));
-        imgModal.open();
-        const container=document.getElementById("imageContainer");
-        container.innerHTML="";
-        imgs.forEach(src=>{
-          const im = document.createElement("img"); im.src=src;
-          container.appendChild(im);
-        });
+
+    // view-images icon -> show all images for that card
+    document.querySelectorAll(".view-images").forEach((btn, idx) => {
+      btn.onclick = () => {
+        // find images inside same card
+        const card = btn.closest(".card");
+        const imgs = Array.from(card.querySelectorAll(".thumbs img")).map(i=>i.dataset.src);
+        showImages(imgs);
       };
     });
-    document.querySelectorAll(".reporterMobile").forEach(r=>{
-      r.onclick=()=>{navigator.clipboard.writeText(r.dataset.num); M.toast({html:"Copied!"});};
-    });
-    document.querySelectorAll(".delete").forEach(d=>{
-      d.onclick=async()=>{
-        const agentPass = prompt("Enter agent password:");
-        if(agentPass!==user.password){alert("Incorrect password"); return;}
-        if(d.dataset.district!==userDistrict){alert("You cannot delete reports outside your district!"); return;}
-        const reason = prompt("Reason for deletion? fake report, miscontent, fraud info, description fake, duplicate, other");
-        if(!reason) return;
-        const reportType = d.dataset.type, rKey=d.dataset.key, rUser=d.dataset.userid;
-        await set(ref(db,`deletedreportinfo/${rUser}/${rKey}`),{
-          deletedBy:user.name,
-          agentId:userId,
-          agentMobile:user.mobile||"",
-          reason,
-          time:new Date().toLocaleString(),
-          type:reportType
-        });
-        await set(ref(db,`reports/${reportType}/${rKey}`),null);
-        loadReports();
+
+    // map open
+    document.querySelectorAll(".map").forEach(btn=>{
+      btn.onclick = async () => {
+        const lat = parseFloat(btn.dataset.lat) || 0;
+        const lng = parseFloat(btn.dataset.lng) || 0;
+        openMap(lat,lng);
       };
+    });
+
+    // pdf generation
+    document.querySelectorAll(".pdf").forEach(btn=>{
+      btn.onclick = async () => {
+        const card = btn.closest(".card");
+        const desc = card.querySelector(".card-title").innerText;
+        const reporterLine = card.querySelector(".meta").innerText;
+        const imgs = Array.from(card.querySelectorAll(".thumbs img")).map(i=>i.dataset.src);
+        const mapBtn = card.querySelector(".map");
+        const lat = mapBtn ? parseFloat(mapBtn.dataset.lat||0) : 0;
+        const lng = mapBtn ? parseFloat(mapBtn.dataset.lng||0) : 0;
+        await generatePdf({title:desc, reporter:reporterLine, images:imgs, lat,lng});
+      };
+    });
+
+    // delete buttons (agents only)
+    document.querySelectorAll(".delete").forEach(btn=>{
+      btn.onclick = async () => {
+        const key = btn.dataset.key;
+        const type = btn.dataset.type;
+        const reportDistrict = btn.dataset.district || "";
+        // open delete modal and store context
+        deleteModal.open();
+        // store context on confirm button dataset
+        const confirm = document.getElementById("confirmDeleteBtn");
+        confirm.dataset.key = key;
+        confirm.dataset.type = type;
+        confirm.dataset.reportDistrict = reportDistrict;
+      };
+    });
+
+    // deleted mobile copy
+    document.querySelectorAll(".meta a[href^='tel:']").forEach(a=>{
+      a.onclick = (e)=>{ navigator.clipboard.writeText(a.getAttribute('href').replace('tel:','')); M.toast({html:'Phone copied'}); };
     });
   }
 
-  loadReports();
-  document.getElementById("typeFilter").onchange=e=>{currentType=e.target.value; loadReports();}
-  districtFilter.onchange=e=>{currentDistrict=e.target.value; loadReports();}
-  document.getElementById("btnWhy").onclick=async()=>{
-    const deletedSnap = await get(ref(db,"deletedreportinfo"));
-    const container = document.getElementById("deletedContainer");
-    container.innerHTML="";
-    if(deletedSnap.exists()){
-      deletedSnap.forEach(userSnap=>{
-        userSnap.forEach(rSnap=>{
-          const r=rSnap.val();
-          container.innerHTML+=`<div class="card">
-            <div class="card-content">
-              <p><b>Deleted By:</b> ${r.deletedBy} | <b>Mobile:</b> <span class="reporterMobile" data-num="${r.agentMobile}">${r.agentMobile}</span></p>
-              <p><b>Reason:</b> ${r.reason}</p>
-              <p><b>Type:</b> ${r.type} | <b>Time:</b> ${r.time}</p>
-            </div>
-          </div>`;
-        });
-      });
-      attachEvents();
+  function showImages(imgs){
+    const container = document.getElementById("imagesContainer");
+    container.innerHTML = "";
+    imgs.forEach(src=>{
+      const i = document.createElement("img");
+      i.src = src;
+      i.style.maxWidth = "48%";
+      container.appendChild(i);
+    });
+    imagesModal.open();
+  }
+
+  // open leaflet map with Esri World Imagery
+  let lastMap = null;
+  function openMap(lat,lng){
+    const mapDiv = document.getElementById("mapPopup");
+    mapDiv.innerHTML = "";
+    mapModal.open();
+    setTimeout(()=>{
+      if(lastMap){ lastMap.remove(); lastMap = null; }
+      lastMap = L.map(mapDiv, {preferCanvas:true}).setView([lat,lng], 13);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri'
+      }).addTo(lastMap);
+      L.marker([lat,lng]).addTo(lastMap);
+    }, 200);
+  }
+
+  // Generate PDF: include map snapshot (html2canvas) and images, title, reporter
+  async function generatePdf({title, reporter, images, lat, lng}){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'px', format:'a4'});
+    // watermark
+    doc.setFontSize(40); doc.setTextColor(200); doc.text('EMA', doc.internal.pageSize.getWidth()/2 - 40, 60, {align:'center', angle: -30});
+    doc.setFontSize(14); doc.setTextColor(30);
+    doc.text(title, 40, 100);
+    doc.text(reporter, 40, 130);
+
+    // add map snapshot
+    if(lat && lng){
+      // render a temporary leaflet map element for capture
+      const tmp = document.createElement('div'); tmp.style.width='600px'; tmp.style.height='350px'; tmp.style.position='fixed'; tmp.style.left='-9999px'; document.body.appendChild(tmp);
+      const tmpMap = L.map(tmp, {preferCanvas:true}).setView([lat,lng], 13);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(tmpMap);
+      L.marker([lat,lng]).addTo(tmpMap);
+      try{
+        const canvas = await html2canvas(tmp, {useCORS:true, logging:false, backgroundColor:null});
+        const imgData = canvas.toDataURL('image/jpeg', 0.9);
+        doc.addImage(imgData, 'JPEG', 40, 150, 520, 260);
+      }catch(e){
+        // fallback: small text if can't capture
+        doc.text('Map preview unavailable', 40, 150);
+      }
+      tmpMap.remove(); document.body.removeChild(tmp);
     }
-    M.Modal.getInstance(document.getElementById("deletedReportsModal")).open();
-  };
-  document.getElementById("btnHome").onclick=()=>{window.location.href="home.html";};
+
+    // images thumbnails
+    let y = 430;
+    for(const src of images.slice(0,6)){
+      try{
+        const img = await loadImageAsDataURL(src);
+        doc.addImage(img,'JPEG',40,y,160,120);
+        if((y+120) > doc.internal.pageSize.getHeight()-60){ doc.addPage(); y=40; } else { y += 130; }
+      }catch(e){
+        // skip if load fails
+      }
+    }
+
+    doc.save((title||'report') + '.pdf');
+  }
+
+  function loadImageAsDataURL(url){
+    return new Promise((res, rej)=>{
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = ()=> {
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        c.getContext('2d').drawImage(img,0,0);
+        res(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = (e)=> rej(e);
+      img.src = url;
+    });
+  }
+
+  // confirm delete handler
+  document.getElementById("confirmDeleteBtn").addEventListener("click", async ()=>{
+    const enteredAgentId = document.getElementById("agentIdInput").value.trim();
+    const reason = document.getElementById("deleteReason").value;
+    const agree = document.getElementById("deleteAgree").checked;
+    if(!enteredAgentId){ alert("Enter your Agent ID"); return; }
+    if(!reason){ alert("Select reason"); return; }
+    if(!agree){ alert("You must agree"); return; }
+    // verify agent exists and matches agentId stored under users/<userId>/agent/agentId
+    if(!isAgent){ alert("You are not registered as an agent"); return; }
+    if(enteredAgentId !== (agentInfo.agentId || agentInfo.id || "")){ alert("Agent ID mismatch"); return; }
+
+    const confirmBtn = document.getElementById("confirmDeleteBtn");
+    const reportKey = confirmBtn.dataset.key;
+    const reportType = confirmBtn.dataset.type;
+    const reportDistrict = confirmBtn.dataset.reportDistrict;
+
+    if(reportDistrict && agentInfo.district && reportDistrict !== agentInfo.district){
+      alert("You can only delete reports in your assigned district");
+      return;
+    }
+
+    // write deletion info under deletedreportinfo/<reportUserId>/<reportId>
+    // we need reportUserId - we stored it on confirm button dataset when opening modal
+    const reportUserId = confirmBtn.dataset.reportUserId || "";
+    const payload = {
+      deletedBy: agentInfo.name || userId,
+      agentId: agentInfo.agentId || agentInfo.id || "",
+      agentMobile: agentInfo.mobile || "",
+      reason,
+      time: new Date().toLocaleString(),
+      type: reportType || currentType
+    };
+    if(reportUserId){
+      await set(ref(db, `deletedreportinfo/${reportUserId}/${reportKey}`), payload);
+    } else {
+      // if no reporter id, store under deletedreportinfo/unknown/<reportKey>
+      await set(ref(db, `deletedreportinfo/unknown/${reportKey}`), payload);
+    }
+
+    // remove original report
+    await remove(ref(db, `reports/${reportType}/${reportKey}`));
+    deleteModal.close();
+    // clear fields
+    document.getElementById("agentIdInput").value = "";
+    document.getElementById("deleteReason").selectedIndex = 0;
+    document.getElementById("deleteAgree").checked = false;
+    await loadReports();
+    M.toast({html:'Report deleted'});
+  });
+
+  // when delete modal opened we should set confirm dataset: we already assign in attachHandlers when opening
+  // to ensure confirm has context when click, set attributes when opening
+  // update: set triggers above in attachHandlers: confirmDeleteBtn.dataset.* set before open
+
+  // show deleted list
+  document.getElementById("btnWhy").addEventListener("click", async ()=>{
+    const deletedSnap = await get(ref(db, "deletedreportinfo"));
+    const list = document.getElementById("deletedList");
+    list.innerHTML = "";
+    if(!deletedSnap.exists()){ list.innerHTML = "<p>No deleted reports.</p>"; M.Modal.getInstance(document.getElementById("deletedModal")).open(); return; }
+    deletedSnap.forEach(userNode=>{
+      const uid = userNode.key;
+      userNode.forEach(rNode=>{
+        const rid = rNode.key;
+        const info = rNode.val();
+        const card = document.createElement('div'); card.className = 'card';
+        card.innerHTML = `<div class="card-content">
+          <div class="card-title">Report ${escapeHtml(rid)}</div>
+          <div class="meta">Reporter ID: ${escapeHtml(uid)}</div>
+          <div class="meta">Deleted by: ${escapeHtml(info.deletedBy||'')} (${escapeHtml(info.agentId||'')})</div>
+          <div class="meta">Reason: ${escapeHtml(info.reason||'')}</div>
+          <div class="meta">Time: ${escapeHtml(info.time||'')}</div>
+          <div class="meta">Agent mobile: <a href="tel:${escapeAttr(info.agentMobile||'')}" class="agentMobile">${escapeHtml(info.agentMobile||'N/A')}</a></div>
+        </div>`;
+        list.appendChild(card);
+      });
+    });
+    // attach click to agentMobile to copy
+    list.querySelectorAll('.agentMobile').forEach(a=>{
+      a.addEventListener('click', (e)=>{
+        navigator.clipboard.writeText(a.getAttribute('href').replace('tel:',''));
+        M.toast({html:'Agent number copied'});
+        e.preventDefault();
+      });
+    });
+    M.Modal.getInstance(document.getElementById("deletedModal")).open();
+  });
+
+  // When opening delete modal we need to set confirm button dataset with report context.
+  // To do that, intercept clicks on delete icons to set dataset then open modal
+  // slight rewrite of attachHandlers flow: add delegated listener
+  reportList.addEventListener('click', (ev)=>{
+    const del = ev.target.closest('.delete');
+    if(del){
+      const key = del.dataset.key;
+      const type = del.dataset.type;
+      const rdistrict = del.dataset.district || "";
+      // set confirm dataset
+      const confirm = document.getElementById("confirmDeleteBtn");
+      confirm.dataset.key = key;
+      confirm.dataset.type = type;
+      confirm.dataset.reportDistrict = rdistrict;
+      // also set reportUserId if available (find card's reporter userId by reading underlying snapshot? We didn't store it into DOM earlier)
+      // We can try to read reporter id from DOM dataset if we had placed it; we didn't—so attempt to fetch the report node to get userId:
+      (async ()=>{
+        try{
+          const rSnap = await get(ref(db, `reports/${type}/${key}`));
+          if(rSnap.exists()){
+            const rv = rSnap.val();
+            confirm.dataset.reportUserId = rv.userId || "";
+          } else {
+            confirm.dataset.reportUserId = "";
+          }
+        }catch(e){ confirm.dataset.reportUserId = ""; }
+      })();
+      deleteModal.open();
+    }
+  });
+
+  // initial load
+  await loadReports();
+
+  // utility helpers
+  function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+  function escapeAttr(s){ return encodeURIComponent(String(s||'')); }
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
