@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#4CAF50">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Report - Elephant Monitoring App</title>
@@ -325,12 +323,6 @@ reportForm.addEventListener("submit",async(e)=>{
     console.error(err);
   }
 });
-</script>
-  <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js")
-    .then(() => console.log("Service Worker registered"));
-}
 </script>
 
 </body>
