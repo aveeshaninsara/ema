@@ -4,195 +4,125 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EMA Radar</title>
-  
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
   <style>
-    body, html { margin:0; padding:0; height:100%; width:100%; }
-    #map { height:100%; width:100%; }
-    .leaflet-popup-content img { max-width: 150px; display:block; margin:5px 0; }
-    .control-buttons { position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:5px; border-radius:5px; }
-    .control-buttons button { margin:2px; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map { width: 100%; height: 100%; }
+    .control-buttons { position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 5px; border-radius: 5px; }
+    .control-buttons button { margin: 2px; }
+    .leaflet-popup-content img { max-width: 150px; display: block; margin: 5px 0; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div class="control-buttons">
-    <button id="normalBtn">Normal Map</button>
-    <button id="satelliteBtn">Satellite Map</button>
-    <button id="allBtn">All Reports</button>
-    <button id="accidentBtn">Accidents Only</button>
-    <button id="sightingBtn">Sightings Only</button>
-  </div>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div id="map"></div>
+<div class="control-buttons">
+  <button id="normalBtn">Normal Map</button>
+  <button id="satelliteBtn">Satellite Map</button>
+  <button id="allBtn">All Reports</button>
+  <button id="accidentBtn">Accidents Only</button>
+  <button id="sightingBtn">Sightings Only</button>
+</div>
 
-  <!-- OneSignal -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "e7ff97fe-2893-4ca6-9f3d-58e97f5f58c2",
-        serviceWorkerPath: '/ema/OneSignalSDKWorker.js' // <-- fixed path
-      });
-      OneSignal.showSlidedownPrompt();
-    });
-  </script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <script>
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
-      authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-      projectId: "elephant-monitoring-app-99ffd",
-      storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
-      messagingSenderId: "649960879930",
-      appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-      databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const dbRef = firebase.database().ref();
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    // Map setup
-    const map = L.map('map').setView([7.8731, 80.7718], 8); // Sri Lanka center
-    const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM' }).addTo(map);
-    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
+<script>
+  // Initialize Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+    authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+    projectId: "elephant-monitoring-app-99ffd",
+    storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+    messagingSenderId: "649960879930",
+    appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+    databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const dbRef = firebase.database().ref();
 
-    document.getElementById('normalBtn').onclick = ()=> { map.addLayer(normalLayer); map.removeLayer(satelliteLayer); }
-    document.getElementById('satelliteBtn').onclick = ()=> { map.addLayer(satelliteLayer); map.removeLayer(normalLayer); }
+  // Initialize Leaflet map
+  const map = L.map('map').setView([7.8731, 80.7718], 8); // Center Sri Lanka
 
-    let markers = [];
-    let circles = [];
-    let notified = {}; // track notifications per report & distance threshold
+  // Map layers
+  const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
 
-    // Filter functions
-    function showAll() { markers.forEach(m=>m.addTo(map)); circles.forEach(c=>c.addTo(map)); }
-    function showAccidents() { markers.forEach(m=>m.reportType==="accident"?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
-    function showSightings() { markers.forEach(m=>m.reportType==="sighting"?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
-    document.getElementById('allBtn').onclick = showAll;
-    document.getElementById('accidentBtn').onclick = showAccidents;
-    document.getElementById('sightingBtn').onclick = showSightings;
+  // Map switch buttons
+  document.getElementById('normalBtn').onclick = () => { map.addLayer(normalLayer); map.removeLayer(satelliteLayer); }
+  document.getElementById('satelliteBtn').onclick = () => { map.addLayer(satelliteLayer); map.removeLayer(normalLayer); }
 
-    // User location
-    let userMarker = null;
-    let userCircle = null;
-    function updateUserLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(pos=>{
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          if(!userMarker) {
-            userMarker = L.circle([lat,lng], {radius:10, color:'blue'}).addTo(map);
-            userCircle = L.circle([lat,lng], {radius:10, color:'blue', fillOpacity:0.2}).addTo(map);
-          } else {
-            userMarker.setLatLng([lat,lng]);
-            userCircle.setLatLng([lat,lng]);
-          }
-          checkProximity(lat,lng);
-        }, err=>console.error(err), {enableHighAccuracy:true, maximumAge:3000});
+  let markers = [];
+  let circles = [];
+
+  // Filter functions
+  function showAll() { markers.forEach(m=>m.addTo(map)); circles.forEach(c=>c.addTo(map)); }
+  function showAccidents() { markers.forEach(m=>m.reportType==='accident'?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
+  function showSightings() { markers.forEach(m=>m.reportType==='sighting'?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
+
+  document.getElementById('allBtn').onclick = showAll;
+  document.getElementById('accidentBtn').onclick = showAccidents;
+  document.getElementById('sightingBtn').onclick = showSightings;
+
+  // User location
+  let userMarker = null;
+  function updateUserLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (!userMarker) {
+          userMarker = L.circle([lat, lng], { radius: 10, color: 'blue', fillOpacity: 0.5 }).addTo(map);
+        } else {
+          userMarker.setLatLng([lat, lng]);
+        }
+      }, err => console.error(err), { enableHighAccuracy: true, maximumAge: 3000 });
+    }
+  }
+  updateUserLocation();
+
+  // Load reports from Firebase
+  dbRef.on('value', snapshot => {
+    // Clear old markers
+    markers.forEach(m=>map.removeLayer(m));
+    circles.forEach(c=>map.removeLayer(c));
+    markers = [];
+    circles = [];
+
+    snapshot.forEach(childSnap => {
+      const data = childSnap.val();
+      if(!data.lat || !data.lng) return; // Skip invalid
+
+      const type = childSnap.key.toLowerCase().includes('accident')?'accident':'sighting';
+      const color = type==='accident'?'blue':
+                    data.dangerLevel==="High"?'red':
+                    data.dangerLevel==="Medium"?'yellow':'green';
+
+      const marker = L.marker([data.lat, data.lng]);
+      marker.bindPopup(`
+        <b>${type.toUpperCase()}</b><br>
+        Danger: ${data.dangerLevel || 'N/A'}<br>
+        Elephants: ${data.numElephants || 'N/A'}<br>
+        District: ${data.district || 'N/A'}<br>
+        Description: ${data.description || 'N/A'}<br>
+        Reporter: ${data.userName || 'N/A'}<br>
+        <img src="${data.images || ''}" alt="report image"/>
+      `);
+      marker.reportType = type;
+      marker.addTo(map);
+      markers.push(marker);
+
+      // Predicted zone for sightings
+      if(type==='sighting') {
+        const circle = L.circle([data.lat, data.lng], { radius: 1000, color: 'orange', fillOpacity: 0.1 }).addTo(map);
+        circles.push(circle);
       }
-    }
-    updateUserLocation();
-
-    // Load reports from Firebase
-    dbRef.on('value', snapshot => {
-      markers.forEach(m=>map.removeLayer(m));
-      circles.forEach(c=>map.removeLayer(c));
-      markers = [];
-      circles = [];
-      snapshot.forEach(childSnap=>{
-        const data = childSnap.val();
-        if(!data.lat || !data.lng) {
-          console.warn("Invalid coordinates", data);
-          return; // skip invalid report
-        }
-
-        const type = childSnap.key.toLowerCase().includes('accident')?'accident':'sighting';
-        const color = type==='accident'?'blue':
-                      data.dangerLevel==="High"?'red':
-                      data.dangerLevel==="Medium"?'yellow':'green';
-        const marker = L.marker([data.lat, data.lng]);
-        marker.bindPopup(`
-          <b>${type.toUpperCase()}</b><br>
-          Danger: ${data.dangerLevel || 'N/A'}<br>
-          Elephants: ${data.numElephants || 'N/A'}<br>
-          District: ${data.district || 'N/A'}<br>
-          Description: ${data.description || 'N/A'}<br>
-          Reporter: ${data.userName || 'N/A'}<br>
-          <img src="${data.images || ''}" alt="report image"/>
-        `);
-        marker.reportType = type;
-        marker.data = data;
-        marker.addTo(map);
-        markers.push(marker);
-
-        // Predicted zone circle for sightings
-        if(type==='sighting') {
-          const circle = L.circle([data.lat,data.lng], {radius:1000, color:'orange', fillOpacity:0.1}).addTo(map);
-          circles.push(circle);
-          marker.predictedCircle = circle;
-        }
-
-        // New report notification
-        if(!notified[data.time]) {
-          OneSignalDeferred.push(async function(OneSignal) {
-            await OneSignal.sendSelfNotification(
-              "📢 New Elephant Report",
-              `A new report has been uploaded. Check it now.`,
-              window.location.href
-            );
-          });
-          notified[data.time] = true;
-        }
-      });
     });
-
-    // Proximity notifications
-    function checkProximity(userLat, userLng) {
-      markers.forEach(marker=>{
-        if(marker.reportType!=='sighting') return;
-        const d = haversineDistance([userLat,userLng],[marker.data.lat, marker.data.lng])*1000; // meters
-        if(d<=100 && !notified[marker.data.time+'_100']) {
-          sendNotification("⚠️ You are within 100m of an Elephant Sighting!");
-          notified[marker.data.time+'_100']=true;
-        } else if(d<=500 && !notified[marker.data.time+'_500']) {
-          sendNotification("⚠️ You are within 500m of an Elephant Sighting!");
-          notified[marker.data.time+'_500']=true;
-        } else if(d<=1000 && !notified[marker.data.time+'_1000']) {
-          sendNotification("⚠️ You are within 1km of an Elephant Sighting!");
-          notified[marker.data.time+'_1000']=true;
-        }
-      });
-    }
-
-    function sendNotification(message) {
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.sendSelfNotification(
-          "🐘 Elephant Nearby!",
-          message,
-          window.location.href
-        );
-      });
-    }
-
-    function haversineDistance(coords1, coords2) {
-      function toRad(x){ return x*Math.PI/180; }
-      const [lat1,lon1]=coords1;
-      const [lat2,lon2]=coords2;
-      const R=6371;
-      const dLat=toRad(lat2-lat1);
-      const dLon=toRad(lon2-lon1);
-      const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-      const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-      return R*c;
-    }
-  </script>
+  });
+</script>
 </body>
 </html>
