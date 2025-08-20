@@ -39,7 +39,8 @@
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
-        appId: "e7ff97fe-2893-4ca6-9f3d-58e97f5f58c2"
+        appId: "e7ff97fe-2893-4ca6-9f3d-58e97f5f58c2",
+        serviceWorkerPath: '/ema/OneSignalSDKWorker.js',
       });
       // Ask user to subscribe
       OneSignal.showSlidedownPrompt();
