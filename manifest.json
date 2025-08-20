@@ -1,0 +1,21 @@
+{
+  "name": "Elephant Monitoring App",
+  "short_name": "EMA",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4CAF50",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/jvN2hV16/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://i.ibb.co/jvN2hV16/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
