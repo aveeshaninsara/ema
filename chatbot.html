@@ -117,5 +117,11 @@ function sendMessage(){
 sendBtn.addEventListener("click",sendMessage);
 userInput.addEventListener("keypress",function(e){ if(e.key==="Enter") sendMessage(); });
 </script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js")
+    .then(() => console.log("Service Worker registered"));
+}
+</script>
 </body>
 </html>
