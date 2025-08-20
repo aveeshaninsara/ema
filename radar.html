@@ -3,145 +3,91 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EMA Radar</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<title>Radar - Elephant Monitoring App</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 <style>
-html,body{margin:0;padding:0;height:100%;width:100%;font-family:sans-serif;}
-#map{height:100%;width:100%;}
-#controls{position:absolute;top:10px;left:10px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
-#settingsPanel{position:absolute;top:10px;right:10px;z-index:1000;background:#fff;padding:10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:none;}
-button,select,input{margin:5px 0;padding:5px;}
+body{font-family:Roboto,sans-serif;margin:0;padding:0;background:#f4f4f4;}
+#map{height:100vh;width:100%;}
+#notification{position:fixed;top:20px;right:20px;background:#2e7d32;color:white;padding:12px 20px;border-radius:12px;display:none;z-index:1000;}
+#settingsPanel{position:fixed;top:0;right:-300px;width:300px;height:100%;background:white;box-shadow:-4px 0 12px rgba(0,0,0,0.3);transition:0.3s;padding:15px;z-index:999;}
+#settingsPanel.open{right:0;}
+.settingsBtn{position:fixed;top:20px;right:20px;font-size:24px;z-index:1001;color:#2e7d32;cursor:pointer;}
+.modal img{width:100%;border-radius:8px;margin-bottom:10px;}
 </style>
 </head>
 <body>
 <div id="map"></div>
-
-<div id="controls">
-  <select id="reportType">
-    <option value="sightings">Sightings</option>
-    <option value="accidents">Accidents</option>
-  </select>
-  <button id="toggleMap">Satellite View</button>
-  <button id="openSettings">Settings</button>
-</div>
-
+<div id="notification"></div>
+<i class="fas fa-cog settingsBtn" id="settingsBtn"></i>
 <div id="settingsPanel">
-  <label>Notification radius (meters)</label><br>
-  <input type="number" id="notifRadiusInput" value="500"><br>
-  <button id="closeSettings">Close Settings</button>
+<h5>Settings</h5>
+<p>Notification Radius (meters)</p>
+<input type="number" id="notifRadiusInput" value="1000"/>
+<p>
+<label><input type="checkbox" id="alertSound"/><span>Sound on Alert</span></label>
+</p>
+<p>
+<label><input type="checkbox" id="bgAlert"/><span>Background Alerts</span></label>
+</p>
 </div>
-
+<div id="imagesModal" class="modal">
+<div class="modal-content"><h5>Report Images</h5><div id="imagesContainer"></div></div>
+<div class="modal-footer"><a href="#!" class="modal-close btn grey">Close</a></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-import { getDatabase, ref, get, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 const firebaseConfig = {
   apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
   authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "elephant-monitoring-app-99ffd",
   storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
   messagingSenderId: "649960879930",
   appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-  measurementId: "G-GSQEVX635R"
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
-let terrainLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
-let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-let map = L.map('map', {layers:[terrainLayer]}).setView([7.8731,80.7718],7);
-
-let reportMarkers = [];
-let reportCircles = [];
-let reportTypeSelect = document.getElementById('reportType');
-let notifRadiusInput = document.getElementById('notifRadiusInput');
-let notifRadius = parseInt(localStorage.getItem('notifRadius')||500);
-
-function reportFalse(key){
-  const reason = prompt("Reason for false report?");
-  if(reason){
-    push(ref(db,'falseonmap'),{reportKey:key, reason:reason, time:new Date().toLocaleString()});
-    alert("We'll take necessary actions. Stay updated.");
-  }
-}
-
+let map = L.map('map').setView([7.8731,80.7718],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let userMarker=null, sightingMarkers=L.layerGroup().addTo(map), accidentMarkers=L.layerGroup().addTo(map);
+let notifRadius=parseInt(document.getElementById("notifRadiusInput").value);
+let alertSound=document.getElementById("alertSound").checked, bgAlert=document.getElementById("bgAlert").checked;
+document.getElementById("settingsBtn").addEventListener("click",()=>{document.getElementById("settingsPanel").classList.toggle("open");});
+document.getElementById("notifRadiusInput").addEventListener("input",()=>{notifRadius=parseInt(document.getElementById("notifRadiusInput").value);});
+document.getElementById("alertSound").addEventListener("change",()=>{alertSound=document.getElementById("alertSound").checked;});
+document.getElementById("bgAlert").addEventListener("change",()=>{bgAlert=document.getElementById("bgAlert").checked;});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js');}
+function sendAlertNotification(msg){if(navigator.serviceWorker.controller){navigator.serviceWorker.controller.postMessage({type:'ALERT',message:msg});}}
+function showNotification(msg){const n=document.getElementById("notification");n.textContent=msg;n.style.display="block";setTimeout(()=>{n.style.display="none";},3000);if(alertSound)new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3').play();}
 async function loadReports(){
-  reportMarkers.forEach(m=>map.removeLayer(m));
-  reportCircles.forEach(c=>map.removeLayer(c));
-  reportMarkers=[]; reportCircles=[];
-  const type = reportTypeSelect.value;
-  const now = new Date();
-
-  let path = type==='sightings' ? 'reports' : 'accidents';
-  const snapshot = await get(ref(db,path));
-  if(!snapshot.exists()) return;
-
-  snapshot.forEach(snap=>{
-    const data = snap.val();
-    const reportTime = new Date(data.time);
-    if((now-reportTime)/3600000>24) return; // last 24 hours
-    const lat = data.lat;
-    const lng = data.lng;
-    let iconUrl = type==='sightings' 
-      ? 'https://cdn-icons-png.flaticon.com/512/616/616408.png' 
-      : 'https://cdn-icons-png.flaticon.com/512/565/565491.png';
-    let m = L.marker([lat,lng],{icon:L.icon({iconUrl:iconUrl,iconSize:[25,25]})}).addTo(map);
-    reportMarkers.push(m);
-    if(type==='sightings'){
-      let circle = L.circle([lat,lng],{radius:notifRadius,color:'blue',fillOpacity:0.1}).addTo(map);
-      reportCircles.push(circle);
-    }
-    let popupHtml = `<b>${type==='sightings'?'Elephant Sighting':'Elephant Accident'}</b><br>
-                     District: ${data.district||''}<br>
-                     Description: ${data.description||''}<br>
-                     Number: ${data.numElephants||''}<br>
-                     <button onclick="reportFalse('${snap.key}')">False information reported!</button>`;
-    m.bindPopup(popupHtml);
+  const snap=await get(ref(db,"reports"));
+  if(!snap.exists())return;
+  const data=snap.val();
+  Object.entries(data).forEach(([type,reports])=>{
+    Object.entries(reports).forEach(([id,report])=>{
+      const marker=L.marker([report.lat,report.lng]).addTo(type==="sightings"?sightingMarkers:accidentMarkers);
+      marker.bindPopup(`<b>${type.toUpperCase()}</b><br>${report.district||"Unknown"}<br><button class="imageBtn btn blue" data-images='${JSON.stringify(report.images||{})}'>Images</button><button class="falseBtn btn red">False Info</button>`);
+      marker.on('popupopen',()=>{marker.getPopup().getElement().querySelector(".imageBtn").onclick=()=>{const imgs=JSON.parse(marker.getPopup().getElement().querySelector(".imageBtn").getAttribute("data-images"));const container=document.getElementById("imagesContainer");container.innerHTML="";Object.values(imgs).forEach(img=>{const el=document.createElement("img");el.src=img;container.appendChild(el);});M.Modal.getInstance(document.getElementById("imagesModal")).open();};marker.getPopup().getElement().querySelector(".falseBtn").onclick=()=>{showNotification("Reported as false info","red");};});
+    });
   });
 }
-
-reportTypeSelect.addEventListener('change',loadReports);
-loadReports();
-
-// Map toggle
-let satellite=false;
-document.getElementById('toggleMap').addEventListener('click',()=>{
-  if(satellite){map.removeLayer(satelliteLayer);terrainLayer.addTo(map);document.getElementById('toggleMap').textContent='Satellite View';}
-  else{map.removeLayer(terrainLayer);satelliteLayer.addTo(map);document.getElementById('toggleMap').textContent='Normal View';}
-  satellite=!satellite;
-});
-
-// User location
-map.locate({setView:true,watch:true});
-map.on('locationfound', e=>{
-  L.marker([e.latitude,e.longitude]).addTo(map).bindPopup("You are here").openPopup();
-});
-
-// Settings panel
-document.getElementById('openSettings').addEventListener('click',()=>{document.getElementById('settingsPanel').style.display='block';});
-document.getElementById('closeSettings').addEventListener('click',()=>{
-  document.getElementById('settingsPanel').style.display='none';
-  notifRadius = parseInt(notifRadiusInput.value);
-  localStorage.setItem('notifRadius',notifRadius);
-  loadReports();
-});
-
-// Background notifications
-if('serviceWorker' in navigator){
-  const swCode = `
-    self.addEventListener('install', e=>self.skipWaiting());
-    self.addEventListener('activate', e=>self.clients.claim());
-    self.addEventListener('push', e=>{
-      const data = e.data.json();
-      self.registration.showNotification(data.title,{body:data.body,icon:data.icon});
+function trackUser(){navigator.geolocation.watchPosition(pos=>{const lat=pos.coords.latitude,lng=pos.coords.longitude;if(userMarker)map.removeLayer(userMarker);userMarker=L.marker([lat,lng],{icon:L.icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png",iconSize:[32,32]})}).addTo(map);map.setView([lat,lng],13);checkNearbyAlerts(lat,lng);},err=>{showNotification("Unable to get location","red");});}
+function checkNearbyAlerts(lat,lng){
+  [sightingMarkers,accidentMarkers].forEach(layerGroup=>{
+    layerGroup.eachLayer(marker=>{
+      if(marker.getLatLng){
+        const d=map.distance([lat,lng],marker.getLatLng());
+        if(d<=notifRadius){showNotification("Elephant alert nearby!");if(bgAlert)sendAlertNotification("Elephant nearby at "+marker.getLatLng().lat.toFixed(4)+","+marker.getLatLng().lng.toFixed(4));}
+      }
     });
-  `;
-  const blob = new Blob([swCode],{type:'application/javascript'});
-  const url = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(url);
+  });
 }
+loadReports();trackUser();
 </script>
 </body>
 </html>
