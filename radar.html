@@ -40,9 +40,8 @@
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
         appId: "e7ff97fe-2893-4ca6-9f3d-58e97f5f58c2",
-        serviceWorkerPath: '/ema/OneSignalSDKWorker.js',
+        serviceWorkerPath: '/ema/OneSignalSDKWorker.js' // <-- fixed path
       });
-      // Ask user to subscribe
       OneSignal.showSlidedownPrompt();
     });
   </script>
@@ -71,6 +70,7 @@
 
     let markers = [];
     let circles = [];
+    let notified = {}; // track notifications per report & distance threshold
 
     // Filter functions
     function showAll() { markers.forEach(m=>m.addTo(map)); circles.forEach(c=>c.addTo(map)); }
@@ -102,8 +102,6 @@
     updateUserLocation();
 
     // Load reports from Firebase
-    const reports = [];
-    const notified = {}; // track notifications per report & distance threshold
     dbRef.on('value', snapshot => {
       markers.forEach(m=>map.removeLayer(m));
       circles.forEach(c=>map.removeLayer(c));
@@ -111,11 +109,16 @@
       circles = [];
       snapshot.forEach(childSnap=>{
         const data = childSnap.val();
+        if(!data.lat || !data.lng) {
+          console.warn("Invalid coordinates", data);
+          return; // skip invalid report
+        }
+
         const type = childSnap.key.toLowerCase().includes('accident')?'accident':'sighting';
         const color = type==='accident'?'blue':
                       data.dangerLevel==="High"?'red':
                       data.dangerLevel==="Medium"?'yellow':'green';
-        const marker = L.marker([data.lat, data.lng], {icon:L.circleMarker([data.lat,data.lng], {color:color})});
+        const marker = L.marker([data.lat, data.lng]);
         marker.bindPopup(`
           <b>${type.toUpperCase()}</b><br>
           Danger: ${data.dangerLevel || 'N/A'}<br>
@@ -130,7 +133,7 @@
         marker.addTo(map);
         markers.push(marker);
 
-        // Predicted zone circle
+        // Predicted zone circle for sightings
         if(type==='sighting') {
           const circle = L.circle([data.lat,data.lng], {radius:1000, color:'orange', fillOpacity:0.1}).addTo(map);
           circles.push(circle);
