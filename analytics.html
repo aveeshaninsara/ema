@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMA Dashboard - Elephant Monitoring</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Roboto',sans-serif;}
+  body{background:#f4f7f6;color:#333;}
+  header{background:#2e7d32;color:white;padding:20px;text-align:center;}
+  header h1{font-weight:700;font-size:1.5rem;}
+  main{padding:15px;max-width:1200px;margin:0 auto; display:none;} /* hide until loaded */
+  .cards{display:flex;flex-wrap:wrap;gap:15px;margin-bottom:25px;}
+  .card{flex:1 1 150px;background:white;padding:15px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);text-align:center;transition:0.3s;}
+  .card:hover{transform:translateY(-3px);box-shadow:0 6px 15px rgba(0,0,0,0.15);}
+  .card h2{font-size:1.5rem;color:#2e7d32;margin-bottom:5px;}
+  .card p{font-weight:500;font-size:0.85rem;color:#555;}
+  .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:30px;}
+  canvas{background:white;border-radius:12px;padding:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1);}
+  h2.section-title{margin:25px 0 15px 0;font-size:1.2rem;color:#2e7d32;}
+  @media(max-width:600px){
+    .cards{flex-direction:column;}
+    .card h2{font-size:1.2rem;}
+    .card p{font-size:0.8rem;}
+    header h1{font-size:1.2rem;}
+  }
+
+  /* Loader styles */
+  #loader{
+    position:fixed;
+    top:0;left:0;
+    width:100%;height:100%;
+    background:rgba(255,255,255,0.9);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+    font-size:1.2rem;
+    color:#2e7d32;
+    font-weight:700;
+    flex-direction:column;
+  }
+  .spinner{
+    border:6px solid #f3f3f3;
+    border-top:6px solid #2e7d32;
+    border-radius:50%;
+    width:50px;
+    height:50px;
+    animation:spin 1s linear infinite;
+    margin-bottom:15px;
+  }
+  @keyframes spin{
+    0%{transform:rotate(0deg);}
+    100%{transform:rotate(360deg);}
+  }
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  Loading dashboard...
+</div>
+
+<header>
+  <h1>Elephant Monitoring Analytics</h1>
+</header>
+<main>
+  <div class="cards">
+    <div class="card">
+      <h2 id="totalReports">0</h2>
+      <p>Total Reports</p>
+    </div>
+    <div class="card">
+      <h2 id="eleSightings">0</h2>
+      <p>Elephant Sightings</p>
+    </div>
+    <div class="card">
+      <h2 id="humanIncidents">0</h2>
+      <p>Human Incidents</p>
+    </div>
+    <div class="card">
+      <h2 id="criticalReports">0</h2>
+      <p>Critical Reports</p>
+    </div>
+    <div class="card">
+      <h2 id="totalUsers">0</h2>
+      <p>Registered Users</p>
+    </div>
+  </div>
+
+  <h2 class="section-title">Reports by District</h2>
+  <canvas id="districtChart"></canvas>
+
+  <h2 class="section-title">Elephant Sightings by Type</h2>
+  <canvas id="typeChart"></canvas>
+
+  <h2 class="section-title">Single vs Group Sightings</h2>
+  <canvas id="groupChart"></canvas>
+
+  <h2 class="section-title">Reports Over Time</h2>
+  <canvas id="timeChart"></canvas>
+</main>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.appspot.com",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const totalReportsEl = document.getElementById('totalReports');
+const eleSightingsEl = document.getElementById('eleSightings');
+const humanIncidentsEl = document.getElementById('humanIncidents');
+const criticalReportsEl = document.getElementById('criticalReports');
+const totalUsersEl = document.getElementById('totalUsers');
+
+let reportsData = [];
+
+// Show loader until data is loaded
+const loader = document.getElementById('loader');
+const main = document.querySelector('main');
+
+// --- Load users first ---
+const usersPromise = db.ref('users').once('value').then(snapshot=>{
+  const data = snapshot.val()||{};
+  let users=0;
+  Object.values(data).forEach(u=>{if(u.role!=='agent') users++;});
+  totalUsersEl.innerText = users;
+});
+
+// --- Load reports ---
+const reportsPromise = db.ref('reports/accidents').once('value').then(snapshot=>{
+  const data = snapshot.val()||{};
+  let totalReports=0, eleSightings=0, humanIncidents=0, criticalReports=0;
+  let districtCounts={}, typeCounts={}, groupCounts={}, timeCounts={};
+
+  Object.entries(data).forEach(([key,r])=>{
+    totalReports++;
+    if(r.elephant) eleSightings++;
+    if(r.human) humanIncidents++;
+    if(r.critical) criticalReports++;
+    if(r.district) districtCounts[r.district] = (districtCounts[r.district]||0)+1;
+    if(r.eleType) typeCounts[r.eleType] = (typeCounts[r.eleType]||0)+1;
+    if(r.singleOrGroup) groupCounts[r.singleOrGroup] = (groupCounts[r.singleOrGroup]||0)+1;
+    if(r.time){
+      const date = r.time.split(',')[0].trim();
+      timeCounts[date] = (timeCounts[date]||0)+1;
+    }
+    reportsData.push({...r,id:key});
+  });
+
+  totalReportsEl.innerText = totalReports;
+  eleSightingsEl.innerText = eleSightings;
+  humanIncidentsEl.innerText = humanIncidents;
+  criticalReportsEl.innerText = criticalReports;
+
+  renderBarChart('districtChart', districtCounts,'Reports by District');
+  renderBarChart('typeChart', typeCounts,'Elephant Sightings by Type');
+  renderBarChart('groupChart', groupCounts,'Single vs Group Sightings');
+  renderLineChart('timeChart', timeCounts,'Reports Over Time');
+});
+
+// --- Wait for all data ---
+Promise.all([usersPromise,reportsPromise]).then(()=>{
+  loader.style.display = 'none';
+  main.style.display = 'block';
+});
+
+// --- Charts ---
+function renderBarChart(id,data,label){
+  new Chart(document.getElementById(id).getContext('2d'),{
+    type:'bar',
+    data:{labels:Object.keys(data),datasets:[{label:label,data:Object.values(data),backgroundColor:'#2e7d32'}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+}
+
+function renderLineChart(id,data,label){
+  new Chart(document.getElementById(id).getContext('2d'),{
+    type:'line',
+    data:{labels:Object.keys(data),datasets:[{label:label,data:Object.values(data),fill:false,borderColor:'#2e7d32',tension:0.1}]},
+    options:{responsive:true,plugins:{legend:{display:true}}}
+  });
+}
+</script>
+</body>
+</html>
