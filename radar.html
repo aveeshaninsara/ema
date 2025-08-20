@@ -4,58 +4,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EMA Radar</title>
-
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-<!-- Tailwind CDN for UI -->
 <script src="https://cdn.tailwindcss.com"></script>
-
 <style>
   html, body { height: 100%; margin: 0; padding: 0; }
   #map { height: 100%; width: 100%; }
+
+  /* Controls Card */
   .controls-card {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
     background: white; border-radius: 12px; padding: 10px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000;
     display: flex; gap: 8px; flex-wrap: wrap;
   }
-  .leaflet-popup-content img { max-width: 180px; border-radius: 6px; margin-top: 5px; }
-  /* Pulsing user circle */
-  .pulse-circle {
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    background: rgba(0, 123, 255, 0.5);
-    position: absolute;
-    animation: pulse 1.5s infinite;
-    border: 2px solid rgba(0,123,255,0.8);
+
+  @media(max-width: 640px){
+    .controls-card { flex-direction: column; align-items: center; }
+    .controls-card button { width: 100%; }
   }
-  @keyframes pulse {
-    0% { transform: scale(0.8); opacity: 0.7; }
-    50% { transform: scale(1.4); opacity: 0.3; }
-    100% { transform: scale(0.8); opacity: 0.7; }
+
+  /* Marker size */
+  .leaflet-marker-icon { width: 50px !important; height: 50px !important; margin-left: -25px !important; margin-top: -50px !important; }
+
+  /* Status Bar */
+  #statusBar {
+    position: absolute; bottom: 10px; right: 10px;
+    width: 250px; background:white; border-radius:12px; padding:10px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:1000;
+    font-family: sans-serif;
   }
+  #statusHeader { cursor:pointer; font-weight:bold; display:flex; justify-content:space-between; }
+  #statusContent { margin-top:5px; display:block; }
 </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Control Buttons -->
 <div class="controls-card">
-  <button id="normalBtn" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Normal Map</button>
-  <button id="satelliteBtn" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-800">Satellite Map</button>
-  <button id="allBtn" class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600">All Reports</button>
-  <button id="accidentBtn" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">Accidents Only</button>
-  <button id="sightingBtn" class="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600">Sightings Only</button>
+  <button id="mapToggle" class="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Normal Map</button>
+  <button id="filterToggle" class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600">All Reports</button>
 </div>
 
-<!-- Firebase -->
+<div id="statusBar">
+  <div id="statusHeader">Status <span id="toggleIcon">-</span></div>
+  <div id="statusContent">
+    <p id="closestDistance">Closest Elephant: N/A</p>
+    <p id="nearbyCount">Nearby Reports: N/A</p>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -72,97 +72,129 @@
   firebase.initializeApp(firebaseConfig);
   const dbRef = firebase.database().ref();
 
-  // Map Initialization
+  // Map
   const map = L.map('map').setView([7.8731, 80.7718], 8);
-
   const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
   const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-
-  document.getElementById('normalBtn').onclick = () => { map.addLayer(normalLayer); map.removeLayer(satelliteLayer); }
-  document.getElementById('satelliteBtn').onclick = () => { map.addLayer(satelliteLayer); map.removeLayer(normalLayer); }
-
+  let currentMap = 'normal';
+  let currentFilter = 'all';
   let markers = [];
   let circles = [];
 
-  // Filter Functions
-  function showAll() { markers.forEach(m => m.addTo(map)); circles.forEach(c => c.addTo(map)); }
-  function showAccidents() { markers.forEach(m => m.reportType==='accident'?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
-  function showSightings() { markers.forEach(m => m.reportType==='sighting'?m.addTo(map):map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c)); }
+  document.getElementById('mapToggle').onclick = () => {
+    if(currentMap==='normal'){
+      map.removeLayer(normalLayer); map.addLayer(satelliteLayer); currentMap='satellite';
+      document.getElementById('mapToggle').innerText='Satellite Map';
+    } else {
+      map.removeLayer(satelliteLayer); map.addLayer(normalLayer); currentMap='normal';
+      document.getElementById('mapToggle').innerText='Normal Map';
+    }
+  };
 
-  document.getElementById('allBtn').onclick = showAll;
-  document.getElementById('accidentBtn').onclick = showAccidents;
-  document.getElementById('sightingBtn').onclick = showSightings;
+  document.getElementById('filterToggle').onclick = () => {
+    if(currentFilter==='all'){ currentFilter='accidents'; document.getElementById('filterToggle').innerText='Accidents Only'; }
+    else if(currentFilter==='accidents'){ currentFilter='sightings'; document.getElementById('filterToggle').innerText='Sightings Only'; }
+    else { currentFilter='all'; document.getElementById('filterToggle').innerText='All Reports'; }
+    loadReports();
+  };
 
-  // Load Reports
-  dbRef.on('value', snapshot => {
-    markers.forEach(m => map.removeLayer(m));
-    circles.forEach(c => map.removeLayer(c));
-    markers = [];
-    circles = [];
+  // Marker Icons
+  const accidentIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
+  const highIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
+  const mediumIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
+  const lowIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
 
-    snapshot.forEach(childSnap => {
-      const data = childSnap.val();
-      if(!data.lat || !data.lng) return; // Skip invalid
+  function createAccidentPopup(report){
+    return `<b>ACCIDENT</b><br>Reporter: ${report.userName || 'N/A'}<br>Mobile: ${report.userMobile || 'N/A'}<br>District: ${report.district || 'N/A'}<br>Time: ${report.time || 'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;
+  }
 
-      const type = data.numElephants ? 'accident' : 'sighting'; // adjust based on data
-      const color = type==='accident' ? 'blue' :
-                    data.dangerLevel==="High" ? 'red' :
-                    data.dangerLevel==="Medium" ? 'yellow' : 'green';
+  function createSightingPopup(report){
+    return `<b>SIGHTING</b><br>Reporter: ${report.userName || 'N/A'}<br>Mobile: ${report.userMobile || 'N/A'}<br>District: ${report.district || 'N/A'}<br>Time: ${report.time || 'N/A'}<br>Elephants: ${report.numElephants || 'N/A'}<br>Danger Level: ${report.dangerLevel || 'N/A'}<br>Description: ${report.description || 'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;
+  }
 
-      // Marker
-      const marker = L.circleMarker([data.lat, data.lng], {
-        radius: 8,
-        fillColor: color,
-        color: '#333',
-        weight: 1,
-        fillOpacity: 0.9
-      }).addTo(map);
+  function calculateDistance(lat1, lon1, lat2, lon2){
+    const R = 6371000;
+    const dLat = (lat2-lat1)*Math.PI/180;
+    const dLon = (lon2-lon1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
 
-      marker.bindPopup(`
-        <b>${type.toUpperCase()}</b><br>
-        Danger: ${data.dangerLevel || 'N/A'}<br>
-        Elephants: ${data.numElephants || 'N/A'}<br>
-        District: ${data.district || 'N/A'}<br>
-        Description: ${data.description || 'N/A'}<br>
-        Reporter: ${data.userName || 'N/A'}<br>
-        <img src="${data.images || ''}" alt="report image"/>
-      `);
+  function updateStatus(userLat, userLng){
+    let minDist = Infinity;
+    let nearbyCount = 0;
+    markers.forEach(marker=>{
+      const latlng = marker.getLatLng();
+      const d = calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
+      if(d < minDist) minDist = d;
+      if(d <= 1000) nearbyCount++;
+    });
+    document.getElementById('closestDistance').innerText = `Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
+    document.getElementById('nearbyCount').innerText = `Nearby Reports: ${nearbyCount}`;
+  }
 
-      marker.reportType = type;
-      markers.push(marker);
+  document.getElementById('statusHeader').onclick = ()=>{
+    const content = document.getElementById('statusContent');
+    const icon = document.getElementById('toggleIcon');
+    if(content.style.display==='none'){ content.style.display='block'; icon.innerText='-'; }
+    else { content.style.display='none'; icon.innerText='+'; }
+  };
 
-      // Predicted Zone for sightings
-      if(type==='sighting') {
-        const circle = L.circle([data.lat, data.lng], {
-          radius: 1000, color: 'orange', fillOpacity: 0.1
-        }).addTo(map);
-        circles.push(circle);
+  function loadReports(){
+    dbRef.child('reports').get().then(snapshot=>{
+      markers.forEach(m=>map.removeLayer(m));
+      circles.forEach(c=>map.removeLayer(c));
+      markers=[]; circles=[];
+
+      if(!snapshot.exists()) return;
+      const data = snapshot.val();
+
+      if(data.accidents){
+        Object.entries(data.accidents).forEach(([id, report])=>{
+          if(currentFilter!=='all' && currentFilter!=='accidents') return;
+          if(!report.lat || !report.lng) return;
+          const marker = L.marker([report.lat, report.lng], {icon: accidentIcon}).addTo(map);
+          marker.bindPopup(createAccidentPopup(report));
+          markers.push(marker);
+        });
+      }
+
+      if(data.sightings){
+        Object.entries(data.sightings).forEach(([id, report])=>{
+          if(currentFilter!=='all' && currentFilter!=='sightings') return;
+          if(!report.lat || !report.lng) return;
+
+          let icon = report.dangerLevel==='High' ? highIcon : report.dangerLevel==='Medium' ? mediumIcon : lowIcon;
+          const marker = L.marker([report.lat, report.lng], {icon: icon}).addTo(map);
+          marker.bindPopup(createSightingPopup(report));
+          markers.push(marker);
+
+          const circle = L.circle([report.lat, report.lng], { radius: 1000, color: 'orange', fillOpacity: 0.1 }).addTo(map);
+          circles.push(circle);
+        });
       }
     });
-  });
-
-  // User Location - Modern Pulsing Circle
-  let userMarker = null;
-  function updateUserLocation() {
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-
-        if (!userMarker) {
-          userMarker = L.circle([lat, lng], {
-            radius: 12,
-            color: '#007bff',
-            fillColor: '#007bff',
-            fillOpacity: 0.4
-          }).addTo(map);
-        } else {
-          userMarker.setLatLng([lat, lng]);
-        }
-      }, err => console.error(err), { enableHighAccuracy: true, maximumAge: 3000 });
-    }
   }
-  updateUserLocation();
+
+  loadReports();
+
+  // User Location
+  let userMarker = null;
+  if(navigator.geolocation){
+    navigator.geolocation.watchPosition(pos=>{
+      const lat=pos.coords.latitude;
+      const lng=pos.coords.longitude;
+
+      if(!userMarker){
+        userMarker = L.circleMarker([lat,lng], { radius: 12, color:'#007bff', fillColor:'#007bff', fillOpacity:0.6 }).addTo(map);
+      } else userMarker.setLatLng([lat,lng]);
+
+      updateStatus(lat,lng);
+
+    }, err=>console.error(err), { enableHighAccuracy:true, maximumAge:3000 });
+  }
 </script>
+
 </body>
 </html>
