@@ -33,7 +33,8 @@ html, body { height: 100%; margin: 0; padding: 0; }
   font-family: sans-serif;
 }
 #statusHeader { cursor:pointer; font-weight:bold; display:flex; justify-content:space-between; }
-#statusContent { margin-top:5px; display:block; }
+#statusContent { margin-top:5px; display:block; max-height:300px; overflow-y:auto; }
+.status-item { margin-bottom:4px; font-size:0.9rem; }
 </style>
 </head>
 <body>
@@ -50,6 +51,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
   <div id="statusContent">
     <p id="closestDistance">Closest Elephant: N/A</p>
     <p id="nearbyCount">Nearby Reports: N/A</p>
+    <div id="nearbyList"></div>
   </div>
 </div>
 
@@ -60,126 +62,146 @@ html, body { height: 100%; margin: 0; padding: 0; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // ---------------- Firebase ----------------
-  const firebaseConfig = {
-    apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
-    authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
-    projectId: "elephant-monitoring-app-99ffd",
-    storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
-    messagingSenderId: "649960879930",
-    appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-    databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const dbRef = firebase.database().ref();
-  const messaging = firebase.messaging();
+const firebaseConfig = {
+  apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
+  authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
+  projectId: "elephant-monitoring-app-99ffd",
+  storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
+  messagingSenderId: "649960879930",
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
+  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+};
+firebase.initializeApp(firebaseConfig);
 
-  // ---------------- Register Service Worker & FCM ----------------
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/ema/firebase-messaging-sw.js')
-      .then(registration => {
-        console.log('SW registered:', registration.scope);
-        return messaging.getToken({
-          vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg',
-          serviceWorkerRegistration: registration
-        });
-      })
-      .then(token => { console.log('FCM Token:', token); })
-      .catch(err => console.error('FCM getToken error:', err));
+const dbRef = firebase.database().ref();
+const messaging = firebase.messaging();
+let userMarker = null;
+let markers = [];
+let circles = [];
+let currentMap='normal', currentFilter='all';
 
-    messaging.onMessage(payload => {
-      alert('New Notification: ' + (payload.notification?.title || 'Check Elephant Reports'));
+function requestNotificationPermission() {
+  if(Notification.permission === 'default'){
+    Notification.requestPermission().then(permission=>{
+      if(permission==='granted') console.log('Notification permission granted.');
+      else console.log('Notification denied.');
     });
   }
+}
 
-  // ---------------- Map ----------------
-  const map = L.map('map').setView([7.8731, 80.7718], 8);
-  const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-  let currentMap='normal', currentFilter='all', markers=[], circles=[];
+// Register SW and get FCM token
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/ema/firebase-messaging-sw.js')
+  .then(registration=>{
+    console.log('SW registered:', registration.scope);
+    messaging.getToken({vapidKey:'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg', serviceWorkerRegistration:registration})
+    .then(token=>console.log('FCM Token:', token))
+    .catch(err=>console.error('FCM getToken error:', err));
+  }).catch(err=>console.error('SW registration failed:', err));
 
-  document.getElementById('mapToggle').onclick = () => {
-    if(currentMap==='normal'){ map.removeLayer(normalLayer); map.addLayer(satelliteLayer); currentMap='satellite'; document.getElementById('mapToggle').innerText='Satellite Map'; }
-    else { map.removeLayer(satelliteLayer); map.addLayer(normalLayer); currentMap='normal'; document.getElementById('mapToggle').innerText='Normal Map'; }
-  };
+  messaging.onMessage(payload=>{
+    const title = payload.notification?.title || 'EMA Alert';
+    const body = payload.notification?.body || 'Check the elephant reports';
+    const type = payload.data?.type || 'general';
+    new Notification(title, {body, icon:'/ema/icon.png'});
+    console.log('Notification received:', type);
+  });
+}
 
-  document.getElementById('filterToggle').onclick = () => {
-    if(currentFilter==='all'){ currentFilter='accidents'; document.getElementById('filterToggle').innerText='Accidents Only'; }
-    else if(currentFilter==='accidents'){ currentFilter='sightings'; document.getElementById('filterToggle').innerText='Sightings Only'; }
-    else { currentFilter='all'; document.getElementById('filterToggle').innerText='All Reports'; }
-    loadReports();
-  };
+requestNotificationPermission();
 
-  // Icons
-  const accidentIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
-  const highIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
-  const mediumIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
-  const lowIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
+// ---------------- Map ----------------
+const map = L.map('map').setView([7.8731, 80.7718], 8);
+const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri'});
 
-  function createAccidentPopup(r){ return `<b>ACCIDENT</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
-  function createSightingPopup(r){ return `<b>SIGHTING</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br>Elephants: ${r.numElephants||'N/A'}<br>Danger Level: ${r.dangerLevel||'N/A'}<br>Description: ${r.description||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
-
-  function calculateDistance(lat1, lon1, lat2, lon2){
-    const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
-    const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  function updateStatus(userLat, userLng){
-    let minDist=Infinity, nearbyCount=0;
-    markers.forEach(m=>{
-      const latlng=m.getLatLng();
-      const d=calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
-      if(d<minDist) minDist=d;
-      if(d<=1000) nearbyCount++;
-    });
-    document.getElementById('closestDistance').innerText=`Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
-    document.getElementById('nearbyCount').innerText=`Nearby Reports: ${nearbyCount}`;
-  }
-
-  document.getElementById('statusHeader').onclick = ()=>{
-    const c=document.getElementById('statusContent'), i=document.getElementById('toggleIcon');
-    if(c.style.display==='none'){ c.style.display='block'; i.innerText='-'; } else { c.style.display='none'; i.innerText='+'; }
-  };
-
-  function loadReports(){
-    dbRef.child('reports').get().then(snapshot=>{
-      markers.forEach(m=>map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c));
-      markers=[]; circles=[];
-      if(!snapshot.exists()) return; const data=snapshot.val();
-
-      if(data.accidents){ Object.entries(data.accidents).forEach(([id,r])=>{
-        if(currentFilter!=='all' && currentFilter!=='accidents') return;
-        if(!r.lat||!r.lng) return;
-        const m=L.marker([r.lat,r.lng],{icon:accidentIcon}).addTo(map);
-        m.bindPopup(createAccidentPopup(r));
-        markers.push(m);
-      }); }
-
-      if(data.sightings){ Object.entries(data.sightings).forEach(([id,r])=>{
-        if(currentFilter!=='all' && currentFilter!=='sightings') return;
-        if(!r.lat||!r.lng) return;
-        let icon=r.dangerLevel==='High'?highIcon:r.dangerLevel==='Medium'?mediumIcon:lowIcon;
-        const m=L.marker([r.lat,r.lng],{icon:icon}).addTo(map);
-        m.bindPopup(createSightingPopup(r)); markers.push(m);
-        const c=L.circle([r.lat,r.lng],{radius:1000,color:'orange',fillOpacity:0.1}).addTo(map);
-        circles.push(c);
-      }); }
-    });
-  }
-
+document.getElementById('mapToggle').onclick=()=>{
+  if(currentMap==='normal'){ map.removeLayer(normalLayer); map.addLayer(satelliteLayer); currentMap='satellite'; document.getElementById('mapToggle').innerText='Satellite Map'; }
+  else{ map.removeLayer(satelliteLayer); map.addLayer(normalLayer); currentMap='normal'; document.getElementById('mapToggle').innerText='Normal Map'; }
+};
+document.getElementById('filterToggle').onclick=()=>{
+  if(currentFilter==='all'){ currentFilter='accidents'; document.getElementById('filterToggle').innerText='Accidents Only'; }
+  else if(currentFilter==='accidents'){ currentFilter='sightings'; document.getElementById('filterToggle').innerText='Sightings Only'; }
+  else{ currentFilter='all'; document.getElementById('filterToggle').innerText='All Reports'; }
   loadReports();
+};
 
-  // User Location
-  let userMarker=null;
-  if(navigator.geolocation){
-    navigator.geolocation.watchPosition(pos=>{
-      const lat=pos.coords.latitude, lng=pos.coords.longitude;
-      if(!userMarker){ userMarker=L.circleMarker([lat,lng],{radius:16,color:'#007bff',fillColor:'#007bff',fillOpacity:0.7}).addTo(map); }
-      else userMarker.setLatLng([lat,lng]);
-      updateStatus(lat,lng);
-    }, err=>console.error(err), {enableHighAccuracy:true, maximumAge:3000});
-  }
+// Marker Icons
+const accidentIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', iconSize:[50,50], iconAnchor:[25,50]});
+const highIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png', iconSize:[50,50], iconAnchor:[25,50]});
+const mediumIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png', iconSize:[50,50], iconAnchor:[25,50]});
+const lowIcon = L.icon({iconUrl:'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize:[50,50], iconAnchor:[25,50]});
+
+function createAccidentPopup(r){ return `<b>ACCIDENT</b><br>Reporter: ${r.userName||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;}
+function createSightingPopup(r){ return `<b>SIGHTING</b><br>Reporter: ${r.userName||'N/A'}<br>District: ${r.district||'N/A'}<br>Elephants: ${r.numElephants||'N/A'}<br>Danger: ${r.dangerLevel||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;}
+
+function calculateDistance(lat1, lon1, lat2, lon2){
+  const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function updateStatus(userLat,userLng){
+  let minDist=Infinity, nearbyCount=0, listHtml='';
+  markers.forEach(m=>{
+    const latlng=m.getLatLng();
+    const d=calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
+    if(d<minDist) minDist=d;
+    if(d<=1000){ nearbyCount++; listHtml+=`<div class="status-item">${m.getPopup().getContent().replace(/<button.*<\/button>/,'')}</div>`; }
+  });
+  document.getElementById('closestDistance').innerText=`Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
+  document.getElementById('nearbyCount').innerText=`Nearby Reports: ${nearbyCount}`;
+  document.getElementById('nearbyList').innerHTML=listHtml;
+}
+
+document.getElementById('statusHeader').onclick=()=>{
+  const c=document.getElementById('statusContent'), i=document.getElementById('toggleIcon');
+  if(c.style.display==='none'){ c.style.display='block'; i.innerText='-'; } else { c.style.display='none'; i.innerText='+'; }
+};
+
+function loadReports(){
+  dbRef.child('reports').get().then(snapshot=>{
+    markers.forEach(m=>map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c));
+    markers=[]; circles=[];
+    if(!snapshot.exists()) return; const data=snapshot.val();
+
+    if(data.accidents){ Object.entries(data.accidents).forEach(([id,r])=>{
+      if(currentFilter!=='all' && currentFilter!=='accidents') return;
+      if(!r.lat||!r.lng) return;
+      const m=L.marker([r.lat,r.lng],{icon:accidentIcon}).addTo(map);
+      m.bindPopup(createAccidentPopup(r)); markers.push(m);
+
+      // Trigger notification for new accident
+      if(Notification.permission==='granted'){ new Notification('New Accident', {body:`District: ${r.district}`, icon:'/ema/icon.png'}); }
+    }); }
+
+    if(data.sightings){ Object.entries(data.sightings).forEach(([id,r])=>{
+      if(currentFilter!=='all' && currentFilter!=='sightings') return;
+      if(!r.lat||!r.lng) return;
+      let icon=r.dangerLevel==='High'?highIcon:r.dangerLevel==='Medium'?mediumIcon:lowIcon;
+      const m=L.marker([r.lat,r.lng],{icon:icon}).addTo(map);
+      m.bindPopup(createSightingPopup(r)); markers.push(m);
+      const c=L.circle([r.lat,r.lng],{radius:1000,color:'orange',fillOpacity:0.1}).addTo(map); circles.push(c);
+
+      if(Notification.permission==='granted'){
+        let title=`New Sighting (${r.dangerLevel})`;
+        new Notification(title,{body:`District: ${r.district}`, icon:'/ema/icon.png'});
+      }
+    }); }
+  });
+}
+
+loadReports();
+
+// User Location
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(pos=>{
+    const lat=pos.coords.latitude,lng=pos.coords.longitude;
+    if(!userMarker){ userMarker=L.circleMarker([lat,lng],{radius:16,color:'#007bff',fillColor:'#007bff',fillOpacity:0.7}).addTo(map); }
+    else userMarker.setLatLng([lat,lng]);
+    updateStatus(lat,lng);
+  }, err=>console.error(err), {enableHighAccuracy:true, maximumAge:3000});
+}
 </script>
 </body>
 </html>
