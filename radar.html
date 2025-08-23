@@ -7,34 +7,33 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  html, body { height: 100%; margin: 0; padding: 0; }
-  #map { height: 100%; width: 100%; }
+html, body { height: 100%; margin: 0; padding: 0; }
+#map { height: 100%; width: 100%; }
 
-  /* Controls Card */
-  .controls-card {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    background: white; border-radius: 12px; padding: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000;
-    display: flex; gap: 8px; flex-wrap: wrap;
-  }
+/* Controls Card */
+.controls-card {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  background: white; border-radius: 12px; padding: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000;
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+@media(max-width: 640px){
+  .controls-card { flex-direction: column; align-items: center; }
+  .controls-card button { width: 100%; }
+}
 
-  @media(max-width: 640px){
-    .controls-card { flex-direction: column; align-items: center; }
-    .controls-card button { width: 100%; }
-  }
+/* Marker size */
+.leaflet-marker-icon { width: 50px !important; height: 50px !important; margin-left: -25px !important; margin-top: -50px !important; }
 
-  /* Marker size */
-  .leaflet-marker-icon { width: 50px !important; height: 50px !important; margin-left: -25px !important; margin-top: -50px !important; }
-
-  /* Status Bar */
-  #statusBar {
-    position: absolute; bottom: 10px; right: 10px;
-    width: 250px; background:white; border-radius:12px; padding:10px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:1000;
-    font-family: sans-serif;
-  }
-  #statusHeader { cursor:pointer; font-weight:bold; display:flex; justify-content:space-between; }
-  #statusContent { margin-top:5px; display:block; }
+/* Status Bar */
+#statusBar {
+  position: absolute; bottom: 10px; right: 10px;
+  width: 250px; background:white; border-radius:12px; padding:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:1000;
+  font-family: sans-serif;
+}
+#statusHeader { cursor:pointer; font-weight:bold; display:flex; justify-content:space-between; }
+#statusContent { margin-top:5px; display:block; }
 </style>
 </head>
 <body>
@@ -54,7 +53,6 @@
   </div>
 </div>
 
-<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
@@ -73,36 +71,20 @@
   };
   firebase.initializeApp(firebaseConfig);
   const dbRef = firebase.database().ref();
+
+  // Initialize Messaging
   const messaging = firebase.messaging();
+  messaging.useServiceWorker('/ema/firebase-messaging-sw.js'); // Correct SW path
+  messaging.getToken({ vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg' })
+    .then((currentToken) => {
+      if (currentToken) console.log('FCM Token:', currentToken);
+    }).catch((err) => console.error('FCM error:', err));
 
-  // Request Notification Permission + Get Token
-  async function initFCM() {
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        const token = await messaging.getToken({
-          vapidKey: "BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg"
-        });
-        console.log("FCM Token:", token);
-      } else {
-        console.warn("Notification permission denied.");
-      }
-    } catch (err) {
-      console.error("FCM error:", err);
-    }
-  }
-  initFCM();
-
-  // Foreground messages
   messaging.onMessage((payload) => {
-    console.log("Message received:", payload);
-    new Notification(payload.notification.title, {
-      body: payload.notification.body,
-      icon: payload.notification.icon
-    });
+    alert('New Notification: ' + (payload.notification?.title || 'Check Elephant Reports'));
   });
 
-  // Map
+  // Map Setup
   const map = L.map('map').setView([7.8731, 80.7718], 8);
   const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
   const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
@@ -217,7 +199,7 @@
       const lng=pos.coords.longitude;
 
       if(!userMarker){
-        userMarker = L.circleMarker([lat,lng], { radius: 12, color:'#007bff', fillColor:'#007bff', fillOpacity:0.6 }).addTo(map);
+        userMarker = L.circleMarker([lat,lng], { radius: 16, color:'#007bff', fillColor:'#007bff', fillOpacity:0.7 }).addTo(map);
       } else userMarker.setLatLng([lat,lng]);
 
       updateStatus(lat,lng);
