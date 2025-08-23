@@ -284,6 +284,13 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 });
 </script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/ema/service-worker.js')
+    .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+    .catch(err => console.error('PWA SW registration failed:', err));
+}
+</script>
 
 </body>
 </html>
