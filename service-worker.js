@@ -1,31 +1,33 @@
-const CACHE_NAME = 'ema-pwa-cache-v1';
+const CACHE_NAME = 'ema-cache-v1';
 const urlsToCache = [
-  '/ema/index.html',
-  '/ema/firebase-messaging-sw.js',
-  '/ema/service-worker.js', 
-  '/ema/manifest.json',
-  '/ema/logo.png' 
+  'index.html',
+  'firebase-messaging-sw.js',
+  // list other local assets: CSS/JS/images
+  'logo.png'
 ];
-
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME)
+      .then(cache => Promise.allSettled(urlsToCache.map(url => cache.add(url))))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-    ))
+    caches.keys().then(keys => 
+      Promise.all(keys.map(key => {
+        if (key !== CACHE_NAME) return caches.delete(key);
+      }))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request))
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+      .catch(() => caches.match('index.html')) // fallback offline
   );
 });
