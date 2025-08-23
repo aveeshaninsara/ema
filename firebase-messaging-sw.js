@@ -7,20 +7,16 @@ firebase.initializeApp({
   projectId: "elephant-monitoring-app-99ffd",
   storageBucket: "elephant-monitoring-app-99ffd.firebasestorage.app",
   messagingSenderId: "649960879930",
-  appId: "1:649960879930:web:d6f703cea9029a2fd14203",
-  databaseURL: "https://elephant-monitoring-app-99ffd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  appId: "1:649960879930:web:d6f703cea9029a2fd14203"
 });
 
 const messaging = firebase.messaging();
 
-// Optional: handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification?.title || 'New Notification';
+messaging.onBackgroundMessage(payload => {
+  const notificationTitle = payload.notification?.title || 'EMA Alert';
   const notificationOptions = {
-    body: payload.notification?.body || '',
-    icon: payload.notification?.icon || '/favicon.ico'
+    body: payload.notification?.body || 'Check the elephant reports',
+    icon: '/ema/icon.png'
   };
-
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
