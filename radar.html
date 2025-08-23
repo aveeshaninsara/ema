@@ -53,6 +53,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
   </div>
 </div>
 
+<!-- Firebase & Leaflet -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging-compat.js"></script>
@@ -73,21 +74,23 @@ html, body { height: 100%; margin: 0; padding: 0; }
   const dbRef = firebase.database().ref();
   const messaging = firebase.messaging();
 
-  // Register Service Worker & FCM
-  navigator.serviceWorker.register('/ema/firebase-messaging-sw.js')
-    .then(registration => {
-      console.log('SW registered:', registration.scope);
-      messaging.getToken({
-        vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg',
-        serviceWorkerRegistration: registration
-      }).then(token => {
-        console.log('FCM Token:', token);
-      }).catch(err => console.error('FCM getToken error:', err));
-    }).catch(err => console.error('SW registration failed:', err));
+  // ---------------- Register Service Worker & FCM ----------------
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/ema/firebase-messaging-sw.js')
+      .then(registration => {
+        console.log('SW registered:', registration.scope);
+        return messaging.getToken({
+          vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg',
+          serviceWorkerRegistration: registration
+        });
+      })
+      .then(token => { console.log('FCM Token:', token); })
+      .catch(err => console.error('FCM getToken error:', err));
 
-  messaging.onMessage(payload => {
-    alert('New Notification: ' + (payload.notification?.title || 'Check Elephant Reports'));
-  });
+    messaging.onMessage(payload => {
+      alert('New Notification: ' + (payload.notification?.title || 'Check Elephant Reports'));
+    });
+  }
 
   // ---------------- Map ----------------
   const map = L.map('map').setView([7.8731, 80.7718], 8);
@@ -114,25 +117,24 @@ html, body { height: 100%; margin: 0; padding: 0; }
   const lowIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
 
   function createAccidentPopup(r){ return `<b>ACCIDENT</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
-
   function createSightingPopup(r){ return `<b>SIGHTING</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br>Elephants: ${r.numElephants||'N/A'}<br>Danger Level: ${r.dangerLevel||'N/A'}<br>Description: ${r.description||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
 
   function calculateDistance(lat1, lon1, lat2, lon2){
     const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
     return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
   function updateStatus(userLat, userLng){
     let minDist=Infinity, nearbyCount=0;
     markers.forEach(m=>{
-      const latlng = m.getLatLng();
-      const d = calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
+      const latlng=m.getLatLng();
+      const d=calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
       if(d<minDist) minDist=d;
       if(d<=1000) nearbyCount++;
     });
-    document.getElementById('closestDistance').innerText = `Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
-    document.getElementById('nearbyCount').innerText = `Nearby Reports: ${nearbyCount}`;
+    document.getElementById('closestDistance').innerText=`Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
+    document.getElementById('nearbyCount').innerText=`Nearby Reports: ${nearbyCount}`;
   }
 
   document.getElementById('statusHeader').onclick = ()=>{
@@ -157,7 +159,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
       if(data.sightings){ Object.entries(data.sightings).forEach(([id,r])=>{
         if(currentFilter!=='all' && currentFilter!=='sightings') return;
         if(!r.lat||!r.lng) return;
-        let icon = r.dangerLevel==='High'?highIcon:r.dangerLevel==='Medium'?mediumIcon:lowIcon;
+        let icon=r.dangerLevel==='High'?highIcon:r.dangerLevel==='Medium'?mediumIcon:lowIcon;
         const m=L.marker([r.lat,r.lng],{icon:icon}).addTo(map);
         m.bindPopup(createSightingPopup(r)); markers.push(m);
         const c=L.circle([r.lat,r.lng],{radius:1000,color:'orange',fillOpacity:0.1}).addTo(map);
