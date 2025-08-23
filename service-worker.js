@@ -1,5 +1,4 @@
 const CACHE_NAME = 'ema-pwa-cache-v1';
-const CACHE_NAME = 'ema-pwa-cache-v1';
 const urlsToCache = [
   '/ema/index.html',
   '/ema/firebase-messaging-sw.js',
