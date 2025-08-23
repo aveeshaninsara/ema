@@ -59,7 +59,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Firebase Config
+  // ---------------- Firebase ----------------
   const firebaseConfig = {
     apiKey: "AIzaSyAwmhg4ZAqqlV5NTyYZNH2MT8m1YQxHkzo",
     authDomain: "elephant-monitoring-app-99ffd.firebaseapp.com",
@@ -71,36 +71,33 @@ html, body { height: 100%; margin: 0; padding: 0; }
   };
   firebase.initializeApp(firebaseConfig);
   const dbRef = firebase.database().ref();
-
-  // Initialize Messaging
   const messaging = firebase.messaging();
-  messaging.useServiceWorker('/ema/firebase-messaging-sw.js'); // Correct SW path
-  messaging.getToken({ vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg' })
-    .then((currentToken) => {
-      if (currentToken) console.log('FCM Token:', currentToken);
-    }).catch((err) => console.error('FCM error:', err));
 
-  messaging.onMessage((payload) => {
+  // Register Service Worker & FCM
+  navigator.serviceWorker.register('/ema/firebase-messaging-sw.js')
+    .then(registration => {
+      console.log('SW registered:', registration.scope);
+      messaging.getToken({
+        vapidKey: 'BGEm1zxPspCDyyLYMeFs1xqFKuKQqp7j8ytcijU4HcpDBXDwB8K1vRMS-rvuewCnTSJYHF41hPcxRSImHgCkeDg',
+        serviceWorkerRegistration: registration
+      }).then(token => {
+        console.log('FCM Token:', token);
+      }).catch(err => console.error('FCM getToken error:', err));
+    }).catch(err => console.error('SW registration failed:', err));
+
+  messaging.onMessage(payload => {
     alert('New Notification: ' + (payload.notification?.title || 'Check Elephant Reports'));
   });
 
-  // Map Setup
+  // ---------------- Map ----------------
   const map = L.map('map').setView([7.8731, 80.7718], 8);
   const normalLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
   const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-  let currentMap = 'normal';
-  let currentFilter = 'all';
-  let markers = [];
-  let circles = [];
+  let currentMap='normal', currentFilter='all', markers=[], circles=[];
 
   document.getElementById('mapToggle').onclick = () => {
-    if(currentMap==='normal'){
-      map.removeLayer(normalLayer); map.addLayer(satelliteLayer); currentMap='satellite';
-      document.getElementById('mapToggle').innerText='Satellite Map';
-    } else {
-      map.removeLayer(satelliteLayer); map.addLayer(normalLayer); currentMap='normal';
-      document.getElementById('mapToggle').innerText='Normal Map';
-    }
+    if(currentMap==='normal'){ map.removeLayer(normalLayer); map.addLayer(satelliteLayer); currentMap='satellite'; document.getElementById('mapToggle').innerText='Satellite Map'; }
+    else { map.removeLayer(satelliteLayer); map.addLayer(normalLayer); currentMap='normal'; document.getElementById('mapToggle').innerText='Normal Map'; }
   };
 
   document.getElementById('filterToggle').onclick = () => {
@@ -110,103 +107,77 @@ html, body { height: 100%; margin: 0; padding: 0; }
     loadReports();
   };
 
-  // Marker Icons
-  const accidentIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
-  const highIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
-  const mediumIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
-  const lowIcon = L.icon({ iconUrl: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize: [50,50], iconAnchor:[25,50] });
+  // Icons
+  const accidentIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
+  const highIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/red-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
+  const mediumIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
+  const lowIcon = L.icon({ iconUrl:'https://maps.google.com/mapfiles/ms/icons/green-dot.png', iconSize:[50,50], iconAnchor:[25,50] });
 
-  function createAccidentPopup(report){
-    return `<b>ACCIDENT</b><br>Reporter: ${report.userName || 'N/A'}<br>Mobile: ${report.userMobile || 'N/A'}<br>District: ${report.district || 'N/A'}<br>Time: ${report.time || 'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;
-  }
+  function createAccidentPopup(r){ return `<b>ACCIDENT</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
 
-  function createSightingPopup(report){
-    return `<b>SIGHTING</b><br>Reporter: ${report.userName || 'N/A'}<br>Mobile: ${report.userMobile || 'N/A'}<br>District: ${report.district || 'N/A'}<br>Time: ${report.time || 'N/A'}<br>Elephants: ${report.numElephants || 'N/A'}<br>Danger Level: ${report.dangerLevel || 'N/A'}<br>Description: ${report.description || 'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`;
-  }
+  function createSightingPopup(r){ return `<b>SIGHTING</b><br>Reporter: ${r.userName||'N/A'}<br>Mobile: ${r.userMobile||'N/A'}<br>District: ${r.district||'N/A'}<br>Time: ${r.time||'N/A'}<br>Elephants: ${r.numElephants||'N/A'}<br>Danger Level: ${r.dangerLevel||'N/A'}<br>Description: ${r.description||'N/A'}<br><button onclick="window.location.href='alert.html'" class="mt-2 px-2 py-1 bg-blue-500 text-white rounded">More Info</button>`; }
 
   function calculateDistance(lat1, lon1, lat2, lon2){
-    const R = 6371000;
-    const dLat = (lat2-lat1)*Math.PI/180;
-    const dLon = (lon2-lon1)*Math.PI/180;
+    const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
     const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+    return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
   function updateStatus(userLat, userLng){
-    let minDist = Infinity;
-    let nearbyCount = 0;
-    markers.forEach(marker=>{
-      const latlng = marker.getLatLng();
+    let minDist=Infinity, nearbyCount=0;
+    markers.forEach(m=>{
+      const latlng = m.getLatLng();
       const d = calculateDistance(userLat,userLng,latlng.lat,latlng.lng);
-      if(d < minDist) minDist = d;
-      if(d <= 1000) nearbyCount++;
+      if(d<minDist) minDist=d;
+      if(d<=1000) nearbyCount++;
     });
     document.getElementById('closestDistance').innerText = `Closest Elephant: ${minDist===Infinity?'N/A':(minDist/1000).toFixed(2)+' km'}`;
     document.getElementById('nearbyCount').innerText = `Nearby Reports: ${nearbyCount}`;
   }
 
   document.getElementById('statusHeader').onclick = ()=>{
-    const content = document.getElementById('statusContent');
-    const icon = document.getElementById('toggleIcon');
-    if(content.style.display==='none'){ content.style.display='block'; icon.innerText='-'; }
-    else { content.style.display='none'; icon.innerText='+'; }
+    const c=document.getElementById('statusContent'), i=document.getElementById('toggleIcon');
+    if(c.style.display==='none'){ c.style.display='block'; i.innerText='-'; } else { c.style.display='none'; i.innerText='+'; }
   };
 
   function loadReports(){
     dbRef.child('reports').get().then(snapshot=>{
-      markers.forEach(m=>map.removeLayer(m));
-      circles.forEach(c=>map.removeLayer(c));
+      markers.forEach(m=>map.removeLayer(m)); circles.forEach(c=>map.removeLayer(c));
       markers=[]; circles=[];
+      if(!snapshot.exists()) return; const data=snapshot.val();
 
-      if(!snapshot.exists()) return;
-      const data = snapshot.val();
+      if(data.accidents){ Object.entries(data.accidents).forEach(([id,r])=>{
+        if(currentFilter!=='all' && currentFilter!=='accidents') return;
+        if(!r.lat||!r.lng) return;
+        const m=L.marker([r.lat,r.lng],{icon:accidentIcon}).addTo(map);
+        m.bindPopup(createAccidentPopup(r));
+        markers.push(m);
+      }); }
 
-      if(data.accidents){
-        Object.entries(data.accidents).forEach(([id, report])=>{
-          if(currentFilter!=='all' && currentFilter!=='accidents') return;
-          if(!report.lat || !report.lng) return;
-          const marker = L.marker([report.lat, report.lng], {icon: accidentIcon}).addTo(map);
-          marker.bindPopup(createAccidentPopup(report));
-          markers.push(marker);
-        });
-      }
-
-      if(data.sightings){
-        Object.entries(data.sightings).forEach(([id, report])=>{
-          if(currentFilter!=='all' && currentFilter!=='sightings') return;
-          if(!report.lat || !report.lng) return;
-
-          let icon = report.dangerLevel==='High' ? highIcon : report.dangerLevel==='Medium' ? mediumIcon : lowIcon;
-          const marker = L.marker([report.lat, report.lng], {icon: icon}).addTo(map);
-          marker.bindPopup(createSightingPopup(report));
-          markers.push(marker);
-
-          const circle = L.circle([report.lat, report.lng], { radius: 1000, color: 'orange', fillOpacity: 0.1 }).addTo(map);
-          circles.push(circle);
-        });
-      }
+      if(data.sightings){ Object.entries(data.sightings).forEach(([id,r])=>{
+        if(currentFilter!=='all' && currentFilter!=='sightings') return;
+        if(!r.lat||!r.lng) return;
+        let icon = r.dangerLevel==='High'?highIcon:r.dangerLevel==='Medium'?mediumIcon:lowIcon;
+        const m=L.marker([r.lat,r.lng],{icon:icon}).addTo(map);
+        m.bindPopup(createSightingPopup(r)); markers.push(m);
+        const c=L.circle([r.lat,r.lng],{radius:1000,color:'orange',fillOpacity:0.1}).addTo(map);
+        circles.push(c);
+      }); }
     });
   }
 
   loadReports();
 
   // User Location
-  let userMarker = null;
+  let userMarker=null;
   if(navigator.geolocation){
     navigator.geolocation.watchPosition(pos=>{
-      const lat=pos.coords.latitude;
-      const lng=pos.coords.longitude;
-
-      if(!userMarker){
-        userMarker = L.circleMarker([lat,lng], { radius: 16, color:'#007bff', fillColor:'#007bff', fillOpacity:0.7 }).addTo(map);
-      } else userMarker.setLatLng([lat,lng]);
-
+      const lat=pos.coords.latitude, lng=pos.coords.longitude;
+      if(!userMarker){ userMarker=L.circleMarker([lat,lng],{radius:16,color:'#007bff',fillColor:'#007bff',fillOpacity:0.7}).addTo(map); }
+      else userMarker.setLatLng([lat,lng]);
       updateStatus(lat,lng);
-
-    }, err=>console.error(err), { enableHighAccuracy:true, maximumAge:3000 });
+    }, err=>console.error(err), {enableHighAccuracy:true, maximumAge:3000});
   }
 </script>
-
 </body>
 </html>
