@@ -12,10 +12,10 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(payload => {
+messaging.onBackgroundMessage(payload=>{
   const notificationTitle = payload.notification?.title || 'EMA Alert';
   const notificationOptions = {
-    body: payload.notification?.body || 'Check the elephant reports',
+    body: payload.notification?.body || 'Check elephant reports',
     icon: '/ema/icon.png'
   };
   self.registration.showNotification(notificationTitle, notificationOptions);
