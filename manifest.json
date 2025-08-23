@@ -1,13 +1,11 @@
 {
-  "name": "Elephant Monitoring App",
+  "name": "EMA",
   "short_name": "EMA",
-  "description": "Real-time Elephant Monitoring and Alerts",
-  "start_url": "/ema/index.html",
+  "description": "Elephant Monitoring App",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007bff",
-  "orientation": "portrait-primary",
-  "scope": "/ema/",
   "icons": [
     {
       "src": "https://i.ibb.co/jvN2hV16/logo.png",
