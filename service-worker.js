@@ -1,11 +1,13 @@
 const CACHE_NAME = 'ema-pwa-cache-v1';
+const CACHE_NAME = 'ema-pwa-cache-v1';
 const urlsToCache = [
   '/ema/index.html',
   '/ema/firebase-messaging-sw.js',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdn.tailwindcss.com'
+  '/ema/service-worker.js', 
+  '/ema/manifest.json',
+  '/ema/logo.png' 
 ];
+
 
 self.addEventListener('install', event => {
   event.waitUntil(
